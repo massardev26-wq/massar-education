@@ -298,13 +298,11 @@ export default async function Level({
                                   Consulter
                                 </a>
 
-                                {/* TELECHARGER DIRECT PDF */}
+                                {/* TELECHARGER */}
                                 <a
-                                  href={r.file_url.replace(
-                                    "/storage/v1/object/public/",
-                                    "/storage/v1/object/download/"
-                                  )}
-                                  download
+                                  href={`/api/download?url=${encodeURIComponent(
+                                    r.file_url
+                                  )}`}
                                   style={{
                                     width: "68px",
                                     height: "58px",
