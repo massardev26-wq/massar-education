@@ -150,13 +150,13 @@ export default async function Level({
                 {chapters.map((chapter: any) => {
                   const chapterItems = items.filter(
                     (r: any) =>
-                      (r.chapters?.title || "Sans chapitre") ===
-                      chapter
+                      (r.chapters?.title ||
+                        "Sans chapitre") === chapter
                   );
 
                   return (
                     <div key={chapter}>
-                      {/* HIDE SANS CHAPITRE */}
+                      {/* MASQUER SANS CHAPITRE */}
                       {chapter !== "Sans chapitre" && (
                         <h3
                           style={{
@@ -298,11 +298,13 @@ export default async function Level({
                                   Consulter
                                 </a>
 
-                                {/* TELECHARGER - OUVERTURE COMME CONSULTER */}
+                                {/* TELECHARGER DIRECT PDF */}
                                 <a
-                                  href={r.file_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  href={r.file_url.replace(
+                                    "/storage/v1/object/public/",
+                                    "/storage/v1/object/download/"
+                                  )}
+                                  download
                                   style={{
                                     width: "68px",
                                     height: "58px",
@@ -341,6 +343,7 @@ export default async function Level({
         })}
       </div>
 
+      {/* PUBLICITE */}
       <div style={{ marginTop: "20px" }}>
         <Ad ad={ad("sidebar")} />
       </div>
