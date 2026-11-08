@@ -1,6 +1,5 @@
-
 <a
-  href={`/api/download?url=${encodeURIComponent(r.file_url)}`}
+  href={`/api/download?url=${encodeURIComponent(r.file_url)}&title=${encodeURIComponent(r.title || "document")}&resource_id=${r.id || ""}&level_id=${r.level_id || ""}&subject_id=${r.subject_id || ""}`}
   style={{
     width: "68px",
     height: "58px",
