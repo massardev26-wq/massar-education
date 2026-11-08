@@ -1,5 +1,6 @@
 
 import "./globals.css";
+import VisitTracker from "./components/VisitTracker";
 
 export const metadata = {
   title: "Association Massar - Espace éducatif",
@@ -19,6 +20,9 @@ export default function Root({
     <html lang="fr">
       <body>
         <div className="page">
+          {/* TRACKING DES VISITES */}
+          <VisitTracker />
+
           {/* HEADER */}
           <header
             style={{
