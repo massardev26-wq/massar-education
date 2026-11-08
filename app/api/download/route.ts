@@ -1,9 +1,17 @@
 
 import { NextRequest } from "next/server";
 import { PDFDocument } from "pdf-lib";
+import { createClient } from "@supabase/supabase-js";
 
 export async function GET(request: NextRequest) {
-  const fileUrl = request.nextUrl.searchParams.get("url");
+  const params = request.nextUrl.searchParams;
+
+  const fileUrl = params.get("url");
+  const resourceTitle = params.get("title") || "document";
+
+  const resourceId = params.get("resource_id");
+  const levelId = params.get("level_id");
+  const subjectId = params.get("subject_id");
 
   if (!fileUrl) {
     return new Response("Lien manquant", { status: 400 });
@@ -11,8 +19,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl) {
+    if (!supabaseUrl || !supabaseKey) {
       return new Response("Configuration manquante", {
         status: 500,
       });
@@ -78,6 +87,28 @@ export async function GET(request: NextRequest) {
     const filename =
       file.pathname.split("/").pop()?.replace(/\.[^.]+$/, "") ||
       "document";
+
+    // Enregistrer le téléchargement dans Supabase
+    const trackingClient = createClient(
+      supabaseUrl,
+      supabaseKey
+    );
+
+    const { error: trackingError } = await trackingClient
+      .from("resource_downloads")
+      .insert({
+        resource_id: resourceId ? Number(resourceId) : null,
+        resource_title: resourceTitle,
+        level_id: levelId ? Number(levelId) : null,
+        subject_id: subjectId ? Number(subjectId) : null,
+      });
+
+    if (trackingError) {
+      console.error(
+        "Erreur tracking téléchargement:",
+        trackingError
+      );
+    }
 
     return new Response(Buffer.from(pdfBytes), {
       headers: {
