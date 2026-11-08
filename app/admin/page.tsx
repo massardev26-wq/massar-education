@@ -1,99 +1,3 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { supabase, TYPES } from "@/lib/supabase";
-
-const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const nm = (arr: any[], id: any) => arr.find((x) => String(x.id) === String(id))?.name || "—";
-const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n || 0);
-const dt = (v: string) => v ? new Date(v).toLocaleDateString("fr-FR") : "—";
-const dtime = (v: string) => v ? new Date(v).toLocaleString("fr-FR") : "—";
-
-const css: any = {
-  page: { minHeight: "100vh", background: "#f4f7fc", color: "#101d4b", fontFamily: "Arial, sans-serif" },
-  sidebar: { background: "linear-gradient(180deg,#062b68,#032052)", color: "white", padding: "18px 12px", minHeight: "100vh" },
-  panel: { background: "#fff", border: "1px solid #dce5f3", borderRadius: 14, boxShadow: "0 2px 8px #0f1e4909", padding: 15 },
-  btn: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 12px", background: "#fff", color: "#102354", fontWeight: 700, cursor: "pointer" },
-  primary: { border: 0, borderRadius: 9, padding: "10px 13px", background: "#0877f9", color: "#fff", fontWeight: 700, cursor: "pointer" },
-  input: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 11px", background: "#fff", color: "#102354", maxWidth: "100%" },
-  th: { background: "#eaf0fb", padding: 10, textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid #d5e0ef" },
-  td: { padding: 10, borderBottom: "1px solid #e6edf6", verticalAlign: "middle" },
-};
-const navItems = [
-  ["dashboard", "⌂", "Tableau de bord"], ["levels", "♧", "Niveaux"], ["subjects", "▱", "Matières"],
-  ["resources", "▤", "Ressources"], ["chapters", "▣", "Chapitres"], ["ads", "◉", "Publicités"],
-  ["stats", "▥", "Statistiques"], ["users", "♙", "Utilisateurs"], ["settings", "⚙", "Paramètres"],
-];
-
-export default function Admin() {
-  const [status, setStatus] = useState("load");
-  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState("");
-  const [section, setSection] = useState("dashboard");
-  const [cycleOpen, setCycleOpen] = useState("Primaire");
-  const [levelSelected, setLevelSelected] = useState<any>(null);
-  const [subjectSelected, setSubjectSelected] = useState<any>(null);
-  const [resourceType, setResourceType] = useState("Toutes");
-  const [resourceSearch, setResourceSearch] = useState("");
-  const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(5);
-  const [startDate, setStartDate] = useState(""); const [endDate, setEndDate] = useState("");
-  const [visitorSearch, setVisitorSearch] = useState("");
-  const [data, setData] = useState<any>({ levels: [], subjects: [], level_subjects: [], chapters: [], resources: [], ads: [], visits: [], downloads: [] });
-  const [form, setForm] = useState<any>({ type: TYPES?.[0] || "Exercice" });
-  const [newLevel, setNewLevel] = useState({ name: "", cycle: "Primaire" });
-  const [newSubject, setNewSubject] = useState({ name: "", icon: "📘", levels: [] as any[] });
-  const [newChapter, setNewChapter] = useState("");
-  const [dateRangeLabel, setDateRangeLabel] = useState("Période personnalisée");
-
-  async function load() {
-    const [levels, subjects, level_subjects, chapters, resources, ads, visits, downloads] = await Promise.all([
-      supabase.from("levels").select("*").order("position"),
-      supabase.from("subjects").select("*").order("name"),
-      supabase.from("level_subjects").select("level_id,subject_id"),
-      supabase.from("chapters").select("*").order("title"),
-      supabase.from("resources").select("*").order("created_at", { ascending: false }),
-      supabase.from("ads").select("*").order("slot"),
-      supabase.from("site_visits").select("visitor_id,page_path,visited_at").order("visited_at", { ascending: false }),
-      supabase.from("resource_downloads").select("resource_id,resource_title,level_id,subject_id,downloaded_at").order("downloaded_at", { ascending: false }),
-    ]);
-    const errs = [levels, subjects, level_subjects, chapters, resources, ads, visits, downloads].filter(x => x.error);
-    if (errs.length) setMessage("Erreur Supabase: " + errs.map(x => x.error?.message).join(" / "));
-    setData({ levels: levels.data || [], subjects: subjects.data || [], level_subjects: level_subjects.data || [], chapters: chapters.data || [], resources: resources.data || [], ads: ads.data || [], visits: visits.data || [], downloads: downloads.data || [] });
-    if (!levelSelected && levels.data?.length) setLevelSelected(levels.data[0].id);
-    if (!subjectSelected && subjects.data?.length) setSubjectSelected(subjects.data[0].id);
-  }
-  async function verify() {
-    setStatus("load"); setMessage("");
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr) setMessage(userErr.message);
-    if (!user) { setStatus("out"); return; }
-    const { data: admin, error } = await supabase.from("admins").select("user_id").eq("user_id", user.id).maybeSingle();
-    if (error) { setMessage(error.message); setStatus("no"); return; }
-    if (!admin) { setMessage("Ce compte n’est pas administrateur."); setStatus("no"); return; }
-    setStatus("ok"); await load();
-  }
-  useEffect(() => { verify(); }, []);
-  async function run(query: any, success = "Enregistré ✅") {
-    const { error } = await query;
-    setMessage(error ? "Erreur : " + error.message : success);
-    if (error) console.error(error);
-    await load();
-  }
-  async function login() {
-    if (!email || !password) { setMessage("Saisissez email et mot de passe."); return; }
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (error) { setMessage("Connexion impossible : " + error.message); return; }
-    await verify();
-  }
-  async function addResource() {
-    if (!form.level_id || !form.subject_id || !form.title?.trim()) { setMessage("Sélectionnez niveau, matière et saisissez le titre."); return; }
-    let file_url = null;
-    if (form.file) {
-      const extension = form.file.name.split(".").pop();
-      const path = Date.now() + "-" + slug(form.file.name.replace(/\.[^.]+$/, "")) + "." + extension;
-      const { error } = await supabase.storage.from("files").upload(path, form.file);
-      if (error) { setMessage("Upload échoué: " + error.message); return; }
-      file_url = supabase.storage.from("files").getPublicUrl(path).data.publicUrl;
-    }
     await run(supabase.from("resources").insert({ level_id: +form.level_id, subject_id: +form.subject_id, chapter_id: form.chapter_id ? +form.chapter_id : null, type: form.type, title: form.title.trim(), description: form.description || null, is_premium: !!form.is_premium, file_url }), "Ressource publiée ✅");
     setForm({ type: TYPES?.[0] || "Exercice" });
   }
@@ -122,7 +26,7 @@ export default function Admin() {
   const topDownloads = Object.entries(downloadCounts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
   const typeCounts: any = {}; data.resources.forEach((r: any) => typeCounts[r.type || "Autres"] = (typeCounts[r.type || "Autres"] || 0) + 1);
   const totalResources = data.resources.length;
-  const filteredResources = data.resources.filter((r: any) => (resourceType === "Toutes" || r.type === resourceType) && r.title?.toLowerCase().includes(resourceSearch.toLowerCase()));
+  const filteredResources = data.resources.filter((r: any) => (!levelSelected || String(r.level_id) === String(levelSelected)) && (!subjectSelected || String(r.subject_id) === String(subjectSelected)) && (resourceType === "Toutes" || r.type === resourceType) && r.title?.toLowerCase().includes(resourceSearch.toLowerCase()));
   const totalPages = Math.max(1, Math.ceil(filteredResources.length / pageSize));
   const shownResources = filteredResources.slice((page - 1) * pageSize, page * pageSize);
   const visitorMap: any = {};
@@ -157,7 +61,7 @@ export default function Admin() {
       <section style={{ padding: "14px 12px", minWidth: 0 }}>
         <header style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div><h1 style={{ margin: "0 0 5px", fontSize: 27 }}>Tableau de bord – <span style={{ color: "#16803b" }}>Association Massar</span></h1><p style={{ margin: 0, color: "#475569" }}>Gérez vos contenus, suivez les statistiques et développez votre plateforme.</p></div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button style={css.btn} onClick={load}>↻ Actualiser</button><button style={css.btn}>🔔</button><button style={css.btn}>A Admin⌄</button></div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button style={css.btn} onClick={load}>↻ Actualiser</button><button style={css.btn} onClick={() => setSection("stats")}>🔔 Statistiques</button><button style={css.btn} onClick={async () => { await supabase.auth.signOut(); setStatus("out"); }}>A Admin · Déconnexion</button></div>
         </header>
         {message && <div style={{ ...css.panel, marginBottom: 10, color: "#075985" }}>{message}</div>}
         <div style={{ ...css.panel, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}><b>📅</b><span>Du</span><input style={css.input} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /><span>au</span><input style={css.input} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /><button style={css.btn} onClick={() => { setStartDate(""); setEndDate(""); }}>Tout afficher</button></div>
@@ -169,13 +73,13 @@ export default function Admin() {
           <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(280px,1fr)", gap: 12 }}>
             <div>
               <div style={css.panel}><h2 style={{ marginTop: 0 }}>🎓 Gestion par niveau</h2>
-                {["Primaire", "Collège", "Lycée"].map(cycle => <div key={cycle} style={{ background: cycle === "Primaire" ? "#e7f2ff" : cycle === "Collège" ? "#f0eaff" : "#e8fae9", padding: 10, borderRadius: 10, marginBottom: 8 }}><b>{cycle}</b><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>{levelsByCycle(cycle).map((l: any) => <button key={l.id} onClick={() => { setLevelSelected(l.id); setSection("levels"); }} style={{ ...css.btn, background: String(levelSelected) === String(l.id) ? "#0877f9" : "white", color: String(levelSelected) === String(l.id) ? "white" : "#102354" }}>{l.name}</button>)}</div></div>)}
+                {["Primaire", "Collège", "Lycée"].map(cycle => <div key={cycle} style={{ background: cycle === "Primaire" ? "#e7f2ff" : cycle === "Collège" ? "#f0eaff" : "#e8fae9", padding: 10, borderRadius: 10, marginBottom: 8 }}><b>{cycle}</b><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>{levelsByCycle(cycle).map((l: any) => <button key={l.id} onClick={() => { setLevelSelected(l.id); const linked = data.level_subjects.filter((ls:any) => String(ls.level_id) === String(l.id)).map((ls:any) => String(ls.subject_id)); const nextSubject = data.subjects.find((sub:any) => linked.includes(String(sub.id))); setSubjectSelected(nextSubject ? nextSubject.id : (data.level_subjects.length ? null : data.subjects[0]?.id)); setPage(1); setSection("dashboard"); }} style={{ ...css.btn, background: String(levelSelected) === String(l.id) ? "#0877f9" : "white", color: String(levelSelected) === String(l.id) ? "white" : "#102354" }}>{l.name}</button>)}</div></div>)}
               </div>
-              <div style={{ ...css.panel, marginTop: 12 }}><h2 style={{ marginTop: 0 }}>📖 {nm(data.levels, levelSelected)} – Gestion des matières</h2><div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{subjectsAtLevel.map((s: any) => <button key={s.id} onClick={() => { setSubjectSelected(s.id); setSection("resources"); }} style={{ ...css.btn, background: String(subjectSelected) === String(s.id) ? "#0877f9" : "white", color: String(subjectSelected) === String(s.id) ? "white" : "#102354" }}>{s.icon || "📘"} {s.name}</button>)}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>{["Toutes", ...(TYPES || [])].map((t: string) => <button key={t} style={{ ...css.btn, background: resourceType === t ? "#0877f9" : "white", color: resourceType === t ? "white" : "#102354" }} onClick={() => { setResourceType(t); setSection("resources"); }}>{t === "Toutes" ? "▤" : "📘"} {t}</button>)}</div>
+              <div style={{ ...css.panel, marginTop: 12 }}><h2 style={{ marginTop: 0 }}>📖 {nm(data.levels, levelSelected)} – Gestion des matières</h2><div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{subjectsAtLevel.map((s: any) => <button key={s.id} onClick={() => { setSubjectSelected(s.id); setPage(1); setSection("dashboard"); }} style={{ ...css.btn, background: String(subjectSelected) === String(s.id) ? "#0877f9" : "white", color: String(subjectSelected) === String(s.id) ? "white" : "#102354" }}>{s.icon || "📘"} {s.name}</button>)}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>{["Toutes", ...(TYPES || [])].map((t: string) => <button key={t} style={{ ...css.btn, background: resourceType === t ? "#0877f9" : "white", color: resourceType === t ? "white" : "#102354" }} onClick={() => { setResourceType(t); setPage(1); setSection("dashboard"); }}>{t === "Toutes" ? "▤" : "📘"} {t}</button>)}</div>
               </div>
               <div style={{ ...css.panel, marginTop: 12 }}><div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, alignItems: "center" }}><h2 style={{ margin: 0 }}>📄 Ressources ({filteredResources.length})</h2><button style={css.primary} onClick={() => setSection("resources")}>＋ Ajouter une ressource</button></div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0" }}><input style={{ ...css.input, flex: 1, minWidth: 180 }} placeholder="⌕ Rechercher un titre…" value={resourceSearch} onChange={e => { setResourceSearch(e.target.value); setPage(1); }} /><select style={css.input} value={resourceType} onChange={e => { setResourceType(e.target.value); setPage(1); }}><option>Toutes</option>{(TYPES || []).map((t: string) => <option key={t}>{t}</option>)}</select><button style={css.btn} onClick={() => alert("Export CSV : fonctionnalité à connecter.")}>⇩ Exporter</button></div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0" }}><input style={{ ...css.input, flex: 1, minWidth: 180 }} placeholder="⌕ Rechercher un titre…" value={resourceSearch} onChange={e => { setResourceSearch(e.target.value); setPage(1); }} /><select style={css.input} value={resourceType} onChange={e => { setResourceType(e.target.value); setPage(1); }}><option>Toutes</option>{(TYPES || []).map((t: string) => <option key={t}>{t}</option>)}</select><button style={css.btn} onClick={() => { const rows = [["Titre","Type","Niveau","Matière","Chapitre","Date","Téléchargements"], ...filteredResources.map((r:any) => [r.title,r.type,nm(data.levels,r.level_id),nm(data.subjects,r.subject_id),nm(data.chapters,r.chapter_id),dt(r.created_at),downloadCounts[r.title]||0])]; const csv = rows.map(row => row.map((cell:any) => `"${String(cell ?? "").replace(/"/g,'""')}"`).join(",")).join("\r\n"); const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"}); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href=url; a.download="ressources-massar.csv"; a.click(); URL.revokeObjectURL(url); }}>⇩ Exporter CSV</button></div>
                 <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}><thead><tr>{["Titre", "Type", "Chapitre", "Date", "Vues", "Téléch.", "Actions"].map(x => <th key={x} style={css.th}>{x}</th>)}</tr></thead><tbody>
                   {shownResources.map((r: any) => <tr key={r.id}><td style={css.td}>📕 {r.title}</td><td style={css.td}><span style={{ background: "#dcfce7", borderRadius: 20, padding: "4px 8px" }}>{r.type}</span></td><td style={css.td}>{nm(data.chapters, r.chapter_id)}</td><td style={css.td}>{dt(r.created_at)}</td><td style={css.td}>—</td><td style={css.td}><b style={{ color: "#15803d" }}>{fmt(downloadCounts[r.title] || 0)}</b></td><td style={css.td}><button style={css.btn} onClick={() => { const title = prompt("Modifier le titre :", r.title); if (title) run(supabase.from("resources").update({ title }).eq("id", r.id), "Modifié ✅"); }}>✎</button> <button style={css.btn} onClick={() => run(supabase.from("resources").update({ is_premium: !r.is_premium }).eq("id", r.id), "Statut changé")}>{r.is_premium ? "🔓" : "🔒"}</button> <button style={{ ...css.btn, color: "#dc2626" }} onClick={() => askDelete(r.title, supabase.from("resources").delete().eq("id", r.id))}>🗑</button></td></tr>)}
                 </tbody></table></div>
