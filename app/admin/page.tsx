@@ -93,4 +93,6 @@ export default function Admin() {
       level_id: +f.level_id, subject_id: +f.subject_id, chapter_id: f.chapter_id ? +f.chapter_id : null,
       type: f.type, title: f.title, description: f.description || null, is_premium: !!f.is_premium, file_url,
     }), "Ressource publiée ✅");
-    setF({ type: TYPES[0] }); setShowAdd(false);
+    setF({ type: TYPES[0] }); setShowAdd(false);}
+
+
