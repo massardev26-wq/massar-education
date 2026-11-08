@@ -1,942 +1,201 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase, TYPES } from "@/lib/supabase";
 
-const slug = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const nm = (arr: any[], id: any) => arr.find((x) => String(x.id) === String(id))?.name || "—";
+const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n || 0);
+const dt = (v: string) => v ? new Date(v).toLocaleDateString("fr-FR") : "—";
+const dtime = (v: string) => v ? new Date(v).toLocaleString("fr-FR") : "—";
 
-const nm = (a: any[], id: any) =>
-  a.find((x) => x.id === id)?.name || "?";
+const css: any = {
+  page: { minHeight: "100vh", background: "#f4f7fc", color: "#101d4b", fontFamily: "Arial, sans-serif" },
+  sidebar: { background: "linear-gradient(180deg,#062b68,#032052)", color: "white", padding: "18px 12px", minHeight: "100vh" },
+  panel: { background: "#fff", border: "1px solid #dce5f3", borderRadius: 14, boxShadow: "0 2px 8px #0f1e4909", padding: 15 },
+  btn: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 12px", background: "#fff", color: "#102354", fontWeight: 700, cursor: "pointer" },
+  primary: { border: 0, borderRadius: 9, padding: "10px 13px", background: "#0877f9", color: "#fff", fontWeight: 700, cursor: "pointer" },
+  input: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 11px", background: "#fff", color: "#102354", maxWidth: "100%" },
+  th: { background: "#eaf0fb", padding: 10, textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid #d5e0ef" },
+  td: { padding: 10, borderBottom: "1px solid #e6edf6", verticalAlign: "middle" },
+};
+const navItems = [
+  ["dashboard", "⌂", "Tableau de bord"], ["levels", "♧", "Niveaux"], ["subjects", "▱", "Matières"],
+  ["resources", "▤", "Ressources"], ["chapters", "▣", "Chapitres"], ["ads", "◉", "Publicités"],
+  ["stats", "▥", "Statistiques"], ["users", "♙", "Utilisateurs"], ["settings", "⚙", "Paramètres"],
+];
 
 export default function Admin() {
-  const [st, setSt] = useState("load");
-  const [em, setEm] = useState("");
-  const [pw, setPw] = useState("");
-  const [msg, setMsg] = useState("");
+  const [status, setStatus] = useState("load");
+  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [message, setMessage] = useState("");
+  const [section, setSection] = useState("dashboard");
+  const [cycleOpen, setCycleOpen] = useState("Primaire");
+  const [levelSelected, setLevelSelected] = useState<any>(null);
+  const [subjectSelected, setSubjectSelected] = useState<any>(null);
+  const [resourceType, setResourceType] = useState("Toutes");
+  const [resourceSearch, setResourceSearch] = useState("");
+  const [page, setPage] = useState(1); const [pageSize, setPageSize] = useState(5);
+  const [startDate, setStartDate] = useState(""); const [endDate, setEndDate] = useState("");
+  const [visitorSearch, setVisitorSearch] = useState("");
+  const [data, setData] = useState<any>({ levels: [], subjects: [], chapters: [], resources: [], ads: [], visits: [], downloads: [] });
+  const [form, setForm] = useState<any>({ type: TYPES?.[0] || "Exercice" });
+  const [newLevel, setNewLevel] = useState({ name: "", cycle: "Primaire" });
+  const [newSubject, setNewSubject] = useState({ name: "", icon: "📘", levels: [] as any[] });
+  const [newChapter, setNewChapter] = useState("");
+  const [dateRangeLabel, setDateRangeLabel] = useState("Période personnalisée");
 
-  const [D, setD] = useState<any>({
-    levels: [],
-    subjects: [],
-    chapters: [],
-    resources: [],
-    ads: [],
-    visits: [],
-    downloads: [],
-  });
-
-  const [f, setF] = useState<any>({ type: TYPES[0] });
-  const [nl, setNl] = useState({ name: "", cycle: "Primaire" });
-  const [ns, setNs] = useState<any>({
-    name: "",
-    icon: "📘",
-    lv: [],
-  });
-  const [nc, setNc] = useState("");
-
-  // Charger les données
   async function load() {
-    try {
-      const [
-        levels,
-        subjects,
-        chapters,
-        resources,
-        ads,
-        visits,
-        downloads,
-      ] = await Promise.all([
-        supabase.from("levels").select("*").order("position"),
-        supabase.from("subjects").select("*").order("name"),
-        supabase.from("chapters").select("*").order("title"),
-        supabase.from("resources").select("*").order("created_at"),
-        supabase.from("ads").select("*").order("slot"),
-        supabase
-          .from("site_visits")
-          .select("visitor_id,page_path,visited_at"),
-        supabase
-          .from("resource_downloads")
-          .select("resource_id,resource_title,downloaded_at"),
-      ]);
-
-      console.log("LOAD LEVELS:", levels.error);
-      console.log("LOAD SUBJECTS:", subjects.error);
-      console.log("LOAD CHAPTERS:", chapters.error);
-      console.log("LOAD RESOURCES:", resources.error);
-      console.log("LOAD ADS:", ads.error);
-      console.log("LOAD VISITS:", visits.error);
-      console.log("LOAD DOWNLOADS:", downloads.error);
-
-      if (
-        levels.error ||
-        subjects.error ||
-        chapters.error ||
-        resources.error ||
-        ads.error ||
-        visits.error ||
-        downloads.error
-      ) {
-        setMsg("Erreur de chargement. Consultez la Console.");
-      }
-
-      setD({
-        levels: levels.data || [],
-        subjects: subjects.data || [],
-        chapters: chapters.data || [],
-        resources: resources.data || [],
-        ads: ads.data || [],
-        visits: visits.data || [],
-        downloads: downloads.data || [],
-      });
-    } catch (error) {
-      console.error("LOAD ERROR:", error);
-      setMsg("Erreur lors du chargement des données.");
-    }
+    const [levels, subjects, chapters, resources, ads, visits, downloads] = await Promise.all([
+      supabase.from("levels").select("*").order("position"),
+      supabase.from("subjects").select("*").order("name"),
+      supabase.from("chapters").select("*").order("title"),
+      supabase.from("resources").select("*").order("created_at", { ascending: false }),
+      supabase.from("ads").select("*").order("slot"),
+      supabase.from("site_visits").select("visitor_id,page_path,visited_at").order("visited_at", { ascending: false }),
+      supabase.from("resource_downloads").select("resource_id,resource_title,level_id,subject_id,downloaded_at").order("downloaded_at", { ascending: false }),
+    ]);
+    const errs = [levels, subjects, chapters, resources, ads, visits, downloads].filter(x => x.error);
+    if (errs.length) setMessage("Erreur Supabase: " + errs.map(x => x.error?.message).join(" / "));
+    setData({ levels: levels.data || [], subjects: subjects.data || [], chapters: chapters.data || [], resources: resources.data || [], ads: ads.data || [], visits: visits.data || [], downloads: downloads.data || [] });
+    if (!levelSelected && levels.data?.length) setLevelSelected(levels.data[0].id);
+    if (!subjectSelected && subjects.data?.length) setSubjectSelected(subjects.data[0].id);
   }
-
-  // Vérifier si l'utilisateur est administrateur
-  async function check() {
-    setSt("load");
-    setMsg("");
-
-    try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      console.log("USER:", user);
-      console.log("USER ERROR:", userError);
-
-      if (userError) {
-        setMsg("Erreur utilisateur : " + userError.message);
-      }
-
-      if (!user) {
-        setSt("out");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("admins")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      console.log("ADMIN USER ID:", user.id);
-      console.log("ADMIN DATA:", data);
-      console.log("ADMIN ERROR:", error);
-
-      if (error) {
-        setMsg("Erreur Admin : " + error.message);
-        setSt("no");
-        return;
-      }
-
-      if (data) {
-        setSt("ok");
-        await load();
-      } else {
-        setMsg("Aucun accès administrateur trouvé pour ce compte.");
-        setSt("no");
-      }
-    } catch (error) {
-      console.error("CHECK ERROR:", error);
-      setMsg("Erreur de vérification.");
-      setSt("out");
-    }
+  async function verify() {
+    setStatus("load"); setMessage("");
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr) setMessage(userErr.message);
+    if (!user) { setStatus("out"); return; }
+    const { data: admin, error } = await supabase.from("admins").select("user_id").eq("user_id", user.id).maybeSingle();
+    if (error) { setMessage(error.message); setStatus("no"); return; }
+    if (!admin) { setMessage("Ce compte n’est pas administrateur."); setStatus("no"); return; }
+    setStatus("ok"); await load();
   }
-
-  useEffect(() => {
-    check();
-  }, []);
-
-  // Exécuter une opération
-  async function run(
-    p: any,
-    ok = "Enregistré ✅"
-  ) {
-    const { error } = await p;
-
-    if (error) {
-      console.error("DATABASE ERROR:", error);
-      setMsg("Erreur : " + error.message);
-    } else {
-      setMsg(ok);
-    }
-
+  useEffect(() => { verify(); }, []);
+  async function run(query: any, success = "Enregistré ✅") {
+    const { error } = await query;
+    setMessage(error ? "Erreur : " + error.message : success);
+    if (error) console.error(error);
     await load();
   }
-
-  // Connexion
   async function login() {
-    setMsg("");
-
-    if (!em || !pw) {
-      setMsg("Veuillez saisir votre email et votre mot de passe.");
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: em.trim(),
-      password: pw,
-    });
-
-    if (error) {
-      console.error("LOGIN ERROR:", error);
-      setMsg("Connexion impossible : " + error.message);
-      return;
-    }
-
-    await check();
+    if (!email || !password) { setMessage("Saisissez email et mot de passe."); return; }
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) { setMessage("Connexion impossible : " + error.message); return; }
+    await verify();
   }
-
-  // Ajouter une ressource PDF ou image
-  async function addRes() {
-    if (!f.level_id || !f.subject_id || !f.title) {
-      setMsg(
-        "Choisissez le niveau, la matière et écrivez un titre."
-      );
-      return;
-    }
-
+  async function addResource() {
+    if (!form.level_id || !form.subject_id || !form.title?.trim()) { setMessage("Sélectionnez niveau, matière et saisissez le titre."); return; }
     let file_url = null;
-
-    if (f.file) {
-      const path =
-        Date.now() +
-        "-" +
-        slug(f.file.name.replace(/\.[^.]+$/, "")) +
-        "." +
-        f.file.name.split(".").pop();
-
-      const { error } = await supabase.storage
-        .from("files")
-        .upload(path, f.file);
-
-      if (error) {
-        console.error("UPLOAD ERROR:", error);
-        setMsg("Erreur d’envoi du fichier : " + error.message);
-        return;
-      }
-
-      file_url = supabase.storage
-        .from("files")
-        .getPublicUrl(path).data.publicUrl;
+    if (form.file) {
+      const extension = form.file.name.split(".").pop();
+      const path = Date.now() + "-" + slug(form.file.name.replace(/\.[^.]+$/, "")) + "." + extension;
+      const { error } = await supabase.storage.from("files").upload(path, form.file);
+      if (error) { setMessage("Upload échoué: " + error.message); return; }
+      file_url = supabase.storage.from("files").getPublicUrl(path).data.publicUrl;
     }
-
-    await run(
-      supabase.from("resources").insert({
-        level_id: +f.level_id,
-        subject_id: +f.subject_id,
-        chapter_id: f.chapter_id ? +f.chapter_id : null,
-        type: f.type,
-        title: f.title,
-        description: f.description || null,
-        is_premium: !!f.is_premium,
-        file_url,
-      }),
-      "Ressource publiée ✅"
-    );
-
-    setF({ type: TYPES[0] });
+    await run(supabase.from("resources").insert({ level_id: +form.level_id, subject_id: +form.subject_id, chapter_id: form.chapter_id ? +form.chapter_id : null, type: form.type, title: form.title.trim(), description: form.description || null, is_premium: !!form.is_premium, file_url }), "Ressource publiée ✅");
+    setForm({ type: TYPES?.[0] || "Exercice" });
   }
+  const askDelete = (name: string, query: any) => { if (confirm(`Supprimer définitivement « ${name} » ?`)) run(query, "Supprimé ✅"); };
+  const filterDate = (value: string) => {
+    if (!value) return false; const date = new Date(value);
+    if (startDate && date < new Date(startDate + "T00:00:00")) return false;
+    if (endDate && date > new Date(endDate + "T23:59:59.999")) return false;
+    return true;
+  };
+  const visits = useMemo(() => data.visits.filter((v: any) => (!startDate && !endDate) || filterDate(v.visited_at)), [data.visits, startDate, endDate]);
+  const downloads = useMemo(() => data.downloads.filter((v: any) => (!startDate && !endDate) || filterDate(v.downloaded_at)), [data.downloads, startDate, endDate]);
+  const unique = new Set(visits.map((v: any) => v.visitor_id).filter(Boolean)).size;
+  const pageCounts: any = {}; visits.forEach((v: any) => pageCounts[v.page_path] = (pageCounts[v.page_path] || 0) + 1);
+  const topPages = Object.entries(pageCounts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
+  const downloadCounts: any = {}; downloads.forEach((d: any) => downloadCounts[d.resource_title || "Document"] = (downloadCounts[d.resource_title || "Document"] || 0) + 1);
+  const topDownloads = Object.entries(downloadCounts).sort((a: any, b: any) => b[1] - a[1]).slice(0, 5);
+  const typeCounts: any = {}; data.resources.forEach((r: any) => typeCounts[r.type || "Autres"] = (typeCounts[r.type || "Autres"] || 0) + 1);
+  const totalResources = data.resources.length;
+  const filteredResources = data.resources.filter((r: any) => (resourceType === "Toutes" || r.type === resourceType) && r.title?.toLowerCase().includes(resourceSearch.toLowerCase()));
+  const totalPages = Math.max(1, Math.ceil(filteredResources.length / pageSize));
+  const shownResources = filteredResources.slice((page - 1) * pageSize, page * pageSize);
+  const visitorMap: any = {};
+  visits.forEach((v: any) => {
+    const id = v.visitor_id || "Sans identifiant";
+    if (!visitorMap[id]) visitorMap[id] = { id, count: 0, pages: new Set(), first: v.visited_at, last: v.visited_at };
+    visitorMap[id].count++; visitorMap[id].pages.add(v.page_path);
+    if (new Date(v.visited_at) < new Date(visitorMap[id].first)) visitorMap[id].first = v.visited_at;
+    if (new Date(v.visited_at) > new Date(visitorMap[id].last)) visitorMap[id].last = v.visited_at;
+  });
+  const visitorRows = Object.values(visitorMap).sort((a: any, b: any) => new Date(b.last).getTime() - new Date(a.last).getTime()).filter((v: any) => v.id.toLowerCase().includes(visitorSearch.toLowerCase()));
+  const dailyMap: any = {};
+  visits.forEach((v: any) => { const key = new Date(v.visited_at).toLocaleDateString("fr-FR"); dailyMap[key] = (dailyMap[key] || 0) + 1; });
+  const daily = Object.entries(dailyMap).slice(-7);
+  const levelsByCycle = (cycle: string) => data.levels.filter((l: any) => l.cycle === cycle);
+  const subjectsAtLevel = data.subjects; // subject-level links remain represented via existing table relationship
+  const chaptersForForm = data.chapters.filter((c: any) => c.level_id == form.level_id && c.subject_id == form.subject_id);
+  const select = (value: any, onChange: any, list: any[], placeholder: string) => <select style={css.input} value={value || ""} onChange={e => onChange(e.target.value)}><option value="">{placeholder}</option>{list.map((i: any) => <option key={i.id} value={i.id}>{i.name || i.title}</option>)}</select>;
 
-  // Sélecteur
-  const sel = (
-    v: any,
-    on: any,
-    items: any[],
-    ph: string
-  ) => (
-    <select
-      value={v || ""}
-      onChange={(e) => on(e.target.value)}
-    >
-      <option value="">{ph}</option>
-      {items.map((i) => (
-        <option key={i.id} value={i.id}>
-          {i.name || i.title}
-        </option>
-      ))}
-    </select>
-  );
+  if (status === "load") return <main style={{ padding: 40, color: "#102354" }}>Chargement de l’administration…</main>;
+  if (status !== "ok") return <main style={{ maxWidth: 460, margin: "60px auto", padding: 24, color: "#102354" }}><h1>Administration Massar</h1><div style={css.panel}><input style={{ ...css.input, width: "100%", marginBottom: 10 }} type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} /><input style={{ ...css.input, width: "100%", marginBottom: 10 }} type="password" placeholder="Mot de passe" value={password} onChange={e => setPassword(e.target.value)} /><button style={css.primary} onClick={login}>Se connecter</button>{message && <p>{message}</p>}</div></main>;
 
-  // Confirmation suppression
-  const ask = (t: string, p: any) =>
-    confirm("Supprimer définitivement : " + t + " ?") &&
-    run(p, "Supprimé ✅");
+  const card = (icon: string, label: string, value: number, color: string) => <div style={{ ...css.panel, background: color, display: "flex", alignItems: "center", gap: 13, minHeight: 95 }}><div style={{ fontSize: 30, background: "#ffffffb8", borderRadius: 12, padding: 12 }}>{icon}</div><div><div style={{ fontWeight: 700, fontSize: 14 }}>{label}</div><div style={{ fontSize: 28, fontWeight: 900 }}>{fmt(value)}</div></div></div>;
 
-  // Chargement
-  if (st === "load") {
-    return (
-      <main className="wrap">
-        <p>Chargement…</p>
-      </main>
-    );
-  }
+  return <main style={css.page}>
+    <div style={{ display: "grid", gridTemplateColumns: "245px minmax(0,1fr)", gap: 12 }}>
+      <aside style={css.sidebar}>
+        <div style={{ textAlign: "center", padding: "10px 4px 22px" }}><div style={{ fontSize: 44 }}>📚</div><h2 style={{ margin: "5px 0", color: "white" }}>Association <span style={{ color: "#34d058" }}>Massar</span></h2><div>Espace Administrateur</div></div>
+        {navItems.map(([key, icon, label]) => <button key={key} onClick={() => setSection(key)} style={{ ...css.btn, display: "block", width: "100%", textAlign: "left", marginBottom: 6, background: section === key ? "#1683f8" : "transparent", color: "white", borderColor: "transparent" }}><span style={{ marginRight: 12 }}>{icon}</span>{label}</button>)}
+        <button onClick={async () => { await supabase.auth.signOut(); setStatus("out"); }} style={{ ...css.btn, display: "block", width: "100%", marginTop: 18 }}>↪ Se déconnecter</button>
+      </aside>
+      <section style={{ padding: "14px 12px", minWidth: 0 }}>
+        <header style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div><h1 style={{ margin: "0 0 5px", fontSize: 27 }}>Tableau de bord – <span style={{ color: "#16803b" }}>Association Massar</span></h1><p style={{ margin: 0, color: "#475569" }}>Gérez vos contenus, suivez les statistiques et développez votre plateforme.</p></div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button style={css.btn} onClick={load}>↻ Actualiser</button><button style={css.btn}>🔔</button><button style={css.btn}>A Admin⌄</button></div>
+        </header>
+        {message && <div style={{ ...css.panel, marginBottom: 10, color: "#075985" }}>{message}</div>}
+        <div style={{ ...css.panel, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}><b>📅</b><span>Du</span><input style={css.input} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /><span>au</span><input style={css.input} type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /><button style={css.btn} onClick={() => { setStartDate(""); setEndDate(""); }}>Tout afficher</button></div>
 
-  // Connexion et vérification Admin
-  if (st !== "ok") {
-    return (
-      <main className="wrap">
-        <h1>Administration</h1>
-
-        {st === "no" && (
-          <p className="msg">
-            Ce compte n’est pas administrateur.
-          </p>
-        )}
-
-        <div className="form">
-          <input
-            type="email"
-            placeholder="Email"
-            value={em}
-            onChange={(e) => setEm(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Mot de passe"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-          />
-
-          <button onClick={login}>
-            Se connecter
-          </button>
-        </div>
-
-        {msg && <p className="msg">{msg}</p>}
-      </main>
-    );
-  }
-
-  const chs = D.chapters.filter(
-    (c: any) =>
-      c.level_id == f.level_id &&
-      c.subject_id == f.subject_id
-  );
-
-  // Statistiques du site
-  const totalVisits = D.visits.length;
-
-  const totalVisitors = new Set(
-    D.visits
-      .map((v: any) => v.visitor_id)
-      .filter(Boolean)
-  ).size;
-
-  const totalDownloads = D.downloads.length;
-
-  // Pages les plus visitées
-  const topPages = Object.entries(
-    D.visits.reduce((acc: any, v: any) => {
-      acc[v.page_path] = (acc[v.page_path] || 0) + 1;
-      return acc;
-    }, {})
-  )
-    .sort((a: any, b: any) => b[1] - a[1])
-    .slice(0, 5);
-
-  // Ressources les plus téléchargées
-  const topDownloads = Object.entries(
-    D.downloads.reduce((acc: any, d: any) => {
-      const title = d.resource_title || "Document";
-      acc[title] = (acc[title] || 0) + 1;
-      return acc;
-    }, {})
-  )
-    .sort((a: any, b: any) => b[1] - a[1])
-    .slice(0, 5);
-
-  // Tableau de bord Admin
-  return (
-    <main className="wrap">
-      <h1>Administration Massar</h1>
-
-      <button
-        className="alt"
-        onClick={async () => {
-          await supabase.auth.signOut();
-          setSt("out");
-          setMsg("");
-        }}
-      >
-        Se déconnecter
-      </button>
-
-      {msg && <p className="msg">{msg}</p>}
-
-      {/* DASHBOARD STATISTIQUES */}
-      <h2>📊 Statistiques du site</h2>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "12px",
-          marginBottom: "25px",
-        }}
-      >
-        {[
-          {
-            title: "Visites totales",
-            value: totalVisits,
-            icon: "👁️",
-          },
-          {
-            title: "Visiteurs uniques",
-            value: totalVisitors,
-            icon: "👥",
-          },
-          {
-            title: "Téléchargements PDF",
-            value: totalDownloads,
-            icon: "📥",
-          },
-        ].map((stat) => (
-          <div
-            key={stat.title}
-            style={{
-              background: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-              borderRadius: "12px",
-              padding: "18px",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: "28px" }}>{stat.icon}</div>
-
-            <div style={{ fontSize: "26px", fontWeight: 900 }}>
-              {stat.value}
-            </div>
-
-            <div style={{ fontWeight: 700 }}>{stat.title}</div>
+        {section === "dashboard" && <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, marginBottom: 12 }}>
+            {card("👥", "Visiteurs", unique, "#eaf3ff")}{card("📄", "Téléchargements", downloads.length, "#eafbef")}{card("▤", "Ressources", totalResources, "#f1eaff")}{card("👁", "Consultations", visits.length, "#fff2e5")}
           </div>
-        ))}
-      </div>
-
-      {/* Pages les plus visitées */}
-      <div className="card" style={{ marginBottom: "20px" }}>
-        <h3>🔥 Pages les plus visitées</h3>
-
-        {topPages.length === 0 ? (
-          <p>Aucune visite enregistrée.</p>
-        ) : (
-          topPages.map(([page, count]: any) => (
-            <div
-              className="row"
-              key={page}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
-              <span>{page}</span>
-              <b>{count} visites</b>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(280px,1fr)", gap: 12 }}>
+            <div>
+              <div style={css.panel}><h2 style={{ marginTop: 0 }}>🎓 Gestion par niveau</h2>
+                {["Primaire", "Collège", "Lycée"].map(cycle => <div key={cycle} style={{ background: cycle === "Primaire" ? "#e7f2ff" : cycle === "Collège" ? "#f0eaff" : "#e8fae9", padding: 10, borderRadius: 10, marginBottom: 8 }}><b>{cycle}</b><div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>{levelsByCycle(cycle).map((l: any) => <button key={l.id} onClick={() => { setLevelSelected(l.id); setSection("levels"); }} style={{ ...css.btn, background: String(levelSelected) === String(l.id) ? "#0877f9" : "white", color: String(levelSelected) === String(l.id) ? "white" : "#102354" }}>{l.name}</button>)}</div></div>)}
+              </div>
+              <div style={{ ...css.panel, marginTop: 12 }}><h2 style={{ marginTop: 0 }}>📖 {nm(data.levels, levelSelected)} – Gestion des matières</h2><div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>{data.subjects.map((s: any) => <button key={s.id} onClick={() => { setSubjectSelected(s.id); setSection("resources"); }} style={{ ...css.btn, background: String(subjectSelected) === String(s.id) ? "#0877f9" : "white", color: String(subjectSelected) === String(s.id) ? "white" : "#102354" }}>{s.icon || "📘"} {s.name}</button>)}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>{["Toutes", ...(TYPES || [])].map((t: string) => <button key={t} style={{ ...css.btn, background: resourceType === t ? "#0877f9" : "white", color: resourceType === t ? "white" : "#102354" }} onClick={() => { setResourceType(t); setSection("resources"); }}>{t === "Toutes" ? "▤" : "📘"} {t}</button>)}</div>
+              </div>
+              <div style={{ ...css.panel, marginTop: 12 }}><div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, alignItems: "center" }}><h2 style={{ margin: 0 }}>📄 Ressources ({filteredResources.length})</h2><button style={css.primary} onClick={() => setSection("resources")}>＋ Ajouter une ressource</button></div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0" }}><input style={{ ...css.input, flex: 1, minWidth: 180 }} placeholder="⌕ Rechercher un titre…" value={resourceSearch} onChange={e => { setResourceSearch(e.target.value); setPage(1); }} /><select style={css.input} value={resourceType} onChange={e => { setResourceType(e.target.value); setPage(1); }}><option>Toutes</option>{(TYPES || []).map((t: string) => <option key={t}>{t}</option>)}</select><button style={css.btn} onClick={() => alert("Export CSV : fonctionnalité à connecter.")}>⇩ Exporter</button></div>
+                <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}><thead><tr>{["Titre", "Type", "Chapitre", "Date", "Vues", "Téléch.", "Actions"].map(x => <th key={x} style={css.th}>{x}</th>)}</tr></thead><tbody>
+                  {shownResources.map((r: any) => <tr key={r.id}><td style={css.td}>📕 {r.title}</td><td style={css.td}><span style={{ background: "#dcfce7", borderRadius: 20, padding: "4px 8px" }}>{r.type}</span></td><td style={css.td}>{nm(data.chapters, r.chapter_id)}</td><td style={css.td}>{dt(r.created_at)}</td><td style={css.td}>—</td><td style={css.td}><b style={{ color: "#15803d" }}>{fmt(downloadCounts[r.title] || 0)}</b></td><td style={css.td}><button style={css.btn} onClick={() => { const title = prompt("Modifier le titre :", r.title); if (title) run(supabase.from("resources").update({ title }).eq("id", r.id), "Modifié ✅"); }}>✎</button> <button style={css.btn} onClick={() => run(supabase.from("resources").update({ is_premium: !r.is_premium }).eq("id", r.id), "Statut changé")}>{r.is_premium ? "🔓" : "🔒"}</button> <button style={{ ...css.btn, color: "#dc2626" }} onClick={() => askDelete(r.title, supabase.from("resources").delete().eq("id", r.id))}>🗑</button></td></tr>)}
+                </tbody></table></div>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginTop: 10, alignItems: "center" }}><span>Afficher <select style={css.input} value={pageSize} onChange={e => { setPageSize(+e.target.value); setPage(1); }}><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option></select> éléments</span><div style={{ display: "flex", gap: 5 }}>{Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 5).map(n => <button key={n} style={{ ...css.btn, background: page === n ? "#0877f9" : "white", color: page === n ? "white" : "#102354" }} onClick={() => setPage(n)}>{n}</button>)}<button style={css.btn} onClick={() => setPage(Math.min(totalPages, page + 1))}>›</button></div></div>
+              </div>
             </div>
-          ))
-        )}
-      </div>
-
-      {/* Ressources les plus téléchargées */}
-      <div className="card" style={{ marginBottom: "25px" }}>
-        <h3>📚 Ressources les plus téléchargées</h3>
-
-        {topDownloads.length === 0 ? (
-          <p>Aucun téléchargement enregistré.</p>
-        ) : (
-          topDownloads.map(([title, count]: any) => (
-            <div
-              className="row"
-              key={title}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
-              <span>{title}</span>
-              <b>{count} téléchargements</b>
+            <div>
+              <div style={css.panel}><h2 style={{ marginTop: 0 }}>📊 Statistiques générales</h2><div style={{ height: 160, display: "flex", alignItems: "end", gap: 8, padding: "10px 2px" }}>{daily.map(([day, count]: any) => <div key={day} title={`${day}: ${count}`} style={{ flex: 1, textAlign: "center" }}><div style={{ height: `${Math.max(8, Number(count) / Math.max(1, ...daily.map((x: any) => Number(x[1]))) * 125)}px`, background: "linear-gradient(#1683f8,#8fc4ff)", borderRadius: "5px 5px 0 0" }} /><small style={{ fontSize: 10 }}>{day.split("/").slice(0,2).join("/")}</small></div>)}</div><small>Visites par jour sur la période sélectionnée</small></div>
+              <div style={{ ...css.panel, marginTop: 12 }}><h2 style={{ marginTop: 0 }}>🏆 Top 5 des téléchargements</h2>{topDownloads.map(([title, count]: any, i: number) => <div key={title} style={{ display: "flex", justifyContent: "space-between", gap: 8, borderBottom: "1px solid #e6edf6", padding: "9px 0", fontSize: 13 }}><span>{i+1}. 📕 {title}</span><b style={{ color: "#15803d" }}>{fmt(count)} ⬇</b></div>)}</div>
+              <div style={{ ...css.panel, marginTop: 12 }}><h2 style={{ marginTop: 0 }}>▤ Répartition par type</h2><div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}><div style={{ width: 130, height: 130, borderRadius: "50%", background: `conic-gradient(${Object.entries(typeCounts).map(([t, n]: any, i) => `${["#1683f8","#22c55e","#9333ea","#f59e0b","#94a3b8"][i%5]} ${Object.values(typeCounts).slice(0,i).reduce((a:any,b:any)=>a+Number(b),0)/Math.max(1,totalResources)*100}% ${(Object.values(typeCounts).slice(0,i).reduce((a:any,b:any)=>a+Number(b),0)+Number(n))/Math.max(1,totalResources)*100}%`).join(",")})`, display: "grid", placeItems: "center" }}><div style={{ width: 75, height: 75, borderRadius: "50%", background: "white", display: "grid", placeItems: "center", textAlign: "center", fontWeight: 900 }}>{totalResources}<small>Ressources</small></div></div><div>{Object.entries(typeCounts).map(([type, count]: any, i) => <div key={type} style={{ fontSize: 12, margin: "6px 0" }}><span style={{ color: ["#1683f8","#22c55e","#9333ea","#f59e0b","#94a3b8"][i%5] }}>●</span> {type}: {count} ({Math.round(Number(count)/Math.max(1,totalResources)*100)}%)</div>)}</div></div></div>
             </div>
-          ))
-        )}
-      </div>
-
-      {/* 1. Ressources */}
-      <h2>1. Ajouter une ressource (PDF ou image)</h2>
-
-      <div className="form">
-        {sel(
-          f.level_id,
-          (v: any) =>
-            setF({ ...f, level_id: v, chapter_id: "" }),
-          D.levels,
-          "Niveau"
-        )}
-
-        {sel(
-          f.subject_id,
-          (v: any) =>
-            setF({ ...f, subject_id: v, chapter_id: "" }),
-          D.subjects,
-          "Matière"
-        )}
-
-        {sel(
-          f.chapter_id,
-          (v: any) => setF({ ...f, chapter_id: v }),
-          chs,
-          "Chapitre (facultatif)"
-        )}
-
-        <select
-          value={f.type}
-          onChange={(e) =>
-            setF({ ...f, type: e.target.value })
-          }
-        >
-          {TYPES.map((t: string) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-
-        <input
-          placeholder="Titre"
-          value={f.title || ""}
-          onChange={(e) =>
-            setF({ ...f, title: e.target.value })
-          }
-        />
-
-        <input
-          placeholder="Description"
-          value={f.description || ""}
-          onChange={(e) =>
-            setF({ ...f, description: e.target.value })
-          }
-        />
-
-        <label>
-          <input
-            type="checkbox"
-            checked={!!f.is_premium}
-            onChange={(e) =>
-              setF({
-                ...f,
-                is_premium: e.target.checked,
-              })
-            }
-          />
-          Premium
-        </label>
-
-        <input
-          type="file"
-          accept=".pdf,image/*"
-          onChange={(e) =>
-            setF({
-              ...f,
-              file: e.target.files?.[0],
-            })
-          }
-        />
-
-        <button onClick={addRes}>
-          Publier
-        </button>
-      </div>
-
-      {/* 2. Ressources publiées */}
-      <h2>
-        2. Ressources publiées ({D.resources.length})
-      </h2>
-
-      {D.resources
-        .slice()
-        .reverse()
-        .map((r: any) => (
-          <div className="row" key={r.id}>
-            <span>
-              <b>{r.title}</b> – {nm(D.levels, r.level_id)} /
-              {nm(D.subjects, r.subject_id)} / {r.type}
-              {r.is_premium ? " 🔒" : ""}
-            </span>
-
-            <span>
-              <button
-                className="alt"
-                onClick={() => {
-                  const t = prompt(
-                    "Nouveau titre :",
-                    r.title
-                  );
-
-                  if (t) {
-                    run(
-                      supabase
-                        .from("resources")
-                        .update({ title: t })
-                        .eq("id", r.id)
-                    );
-                  }
-                }}
-              >
-                Modifier
-              </button>{" "}
-
-              <button
-                className="alt"
-                onClick={() =>
-                  run(
-                    supabase
-                      .from("resources")
-                      .update({
-                        is_premium: !r.is_premium,
-                      })
-                      .eq("id", r.id)
-                  )
-                }
-              >
-                {r.is_premium
-                  ? "Rendre gratuit"
-                  : "Rendre premium"}
-              </button>{" "}
-
-              <button
-                className="del"
-                onClick={() =>
-                  ask(
-                    r.title,
-                    supabase
-                      .from("resources")
-                      .delete()
-                      .eq("id", r.id)
-                  )
-                }
-              >
-                Supprimer
-              </button>
-            </span>
           </div>
-        ))}
+        </>}
 
-      {/* 3. Chapitres */}
-      <h2>3. Chapitres</h2>
+        {section === "stats" && <div style={css.panel}><h2>📊 Statistiques détaillées</h2><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>{card("👥","Visiteurs uniques",unique,"#eaf3ff")}{card("👁","Visites",visits.length,"#eefbf1")}{card("⬇","Téléchargements",downloads.length,"#f1eaff")}{card("▤","Ressources",totalResources,"#fff2e5")}</div><h3>Pages les plus consultées</h3>{topPages.map(([p,c]: any) => <div key={p} style={{ padding: 9, borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between" }}>{p}<b>{c}</b></div>)}</div>}
 
-      <div className="form">
-        {sel(
-          f.level_id,
-          (v: any) => setF({ ...f, level_id: v }),
-          D.levels,
-          "Niveau"
-        )}
+        {section === "visitors" && <div style={css.panel}><h2>👥 Visiteurs détaillés</h2><p>Identifiant navigateur, fréquence et pages visitées; filtrage basé sur la période choisie.</p><input style={{ ...css.input, width: "100%" }} placeholder="Rechercher un visitor ID…" value={visitorSearch} onChange={e => setVisitorSearch(e.target.value)} /><div style={{ overflowX: "auto", marginTop: 12 }}><table style={{ width: "100%", borderCollapse: "collapse" }}><thead><tr>{["Visitor ID","Visites","Pages consultées","Première visite","Dernière visite"].map(x=><th style={css.th} key={x}>{x}</th>)}</tr></thead><tbody>{visitorRows.map((v:any)=><tr key={v.id}><td style={css.td}>{v.id}</td><td style={css.td}>{v.count}</td><td style={css.td}>{[...v.pages].join(", ")}</td><td style={css.td}>{dtime(v.first)}</td><td style={css.td}>{dtime(v.last)}</td></tr>)}</tbody></table></div><h3>Historique de visites récent</h3><div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}><thead><tr>{["Visitor ID","Page","Date / heure"].map(x=><th style={css.th} key={x}>{x}</th>)}</tr></thead><tbody>{visits.slice(0,100).map((v:any,i)=><tr key={i}><td style={css.td}>{v.visitor_id || "—"}</td><td style={css.td}>{v.page_path}</td><td style={css.td}>{dtime(v.visited_at)}</td></tr>)}</tbody></table></div></div>}
 
-        {sel(
-          f.subject_id,
-          (v: any) => setF({ ...f, subject_id: v }),
-          D.subjects,
-          "Matière"
-        )}
+        {section === "resources" && <><div style={css.panel}><h2>＋ Ajouter une ressource</h2><div style={{ display:"flex", flexWrap:"wrap", gap:9 }}>{select(form.level_id,(v:any)=>setForm({...form,level_id:v,chapter_id:""}),data.levels,"Niveau")}{select(form.subject_id,(v:any)=>setForm({...form,subject_id:v,chapter_id:""}),data.subjects,"Matière")}{select(form.chapter_id,(v:any)=>setForm({...form,chapter_id:v}),chaptersForForm,"Chapitre facultatif")}<select style={css.input} value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>{(TYPES||[]).map((t:string)=><option key={t}>{t}</option>)}</select><input style={css.input} placeholder="Titre" value={form.title||""} onChange={e=>setForm({...form,title:e.target.value})}/><input style={css.input} placeholder="Description" value={form.description||""} onChange={e=>setForm({...form,description:e.target.value})}/><label><input type="checkbox" checked={!!form.is_premium} onChange={e=>setForm({...form,is_premium:e.target.checked})}/> Premium</label><input type="file" accept=".pdf,image/*" onChange={e=>setForm({...form,file:e.target.files?.[0]})}/><button style={css.primary} onClick={addResource}>Publier</button></div></div><div style={css.panel}><h2>Ressources publiées ({data.resources.length})</h2>{data.resources.map((r:any)=><div key={r.id} style={{display:"flex",justifyContent:"space-between",gap:8,padding:9,borderBottom:"1px solid #eee",flexWrap:"wrap"}}><span>{r.title} — {nm(data.levels,r.level_id)} / {nm(data.subjects,r.subject_id)} / {r.type} {r.is_premium?"🔒":""}</span><span><button style={css.btn} onClick={()=>{const t=prompt("Nouveau titre",r.title);if(t)run(supabase.from("resources").update({title:t}).eq("id",r.id));}}>Modifier</button> <button style={css.btn} onClick={()=>run(supabase.from("resources").update({is_premium:!r.is_premium}).eq("id",r.id))}>{r.is_premium?"Gratuit":"Premium"}</button> <button style={css.btn} onClick={()=>askDelete(r.title,supabase.from("resources").delete().eq("id",r.id))}>Supprimer</button></span></div>)}</div></>}
 
-        <input
-          placeholder="Titre du chapitre"
-          value={nc}
-          onChange={(e) => setNc(e.target.value)}
-        />
+        {section === "levels" && <div style={css.panel}><h2>🎓 Gestion des niveaux</h2><div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}><input style={css.input} placeholder="Nom du niveau" value={newLevel.name} onChange={e=>setNewLevel({...newLevel,name:e.target.value})}/><select style={css.input} value={newLevel.cycle} onChange={e=>setNewLevel({...newLevel,cycle:e.target.value})}><option>Primaire</option><option>Collège</option><option>Lycée</option></select><button style={css.primary} onClick={()=>{if(!newLevel.name.trim())return setMessage("Saisissez le niveau");run(supabase.from("levels").insert({name:newLevel.name,slug:slug(newLevel.name),cycle:newLevel.cycle,position:100}),"Niveau ajouté");setNewLevel({name:"",cycle:"Primaire"});}}>Ajouter</button></div>{data.levels.map((l:any)=><div key={l.id} style={{display:"flex",justifyContent:"space-between",padding:10,borderBottom:"1px solid #eee"}}>{l.cycle} — {l.name}<button style={css.btn} onClick={()=>askDelete(l.name,supabase.from("levels").delete().eq("id",l.id))}>Supprimer</button></div>)}</div>}
 
-        <button
-          onClick={() => {
-            if (nc && f.level_id && f.subject_id) {
-              run(
-                supabase.from("chapters").insert({
-                  level_id: +f.level_id,
-                  subject_id: +f.subject_id,
-                  title: nc,
-                }),
-                "Chapitre ajouté ✅"
-              );
+        {section === "subjects" && <div style={css.panel}><h2>📚 Gestion des matières</h2><div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}><input style={css.input} placeholder="Nom matière" value={newSubject.name} onChange={e=>setNewSubject({...newSubject,name:e.target.value})}/><input style={{...css.input,width:75}} value={newSubject.icon} onChange={e=>setNewSubject({...newSubject,icon:e.target.value})}/>{data.levels.map((l:any)=><label key={l.id}><input type="checkbox" checked={newSubject.levels.includes(l.id)} onChange={e=>setNewSubject({...newSubject,levels:e.target.checked?[...newSubject.levels,l.id]:newSubject.levels.filter((id:any)=>id!==l.id)})}/>{l.name}</label>)}<button style={css.primary} onClick={async()=>{if(!newSubject.name.trim())return setMessage("Saisissez le nom de matière");const {data:created,error}=await supabase.from("subjects").insert({name:newSubject.name,icon:newSubject.icon}).select().single();if(error)return setMessage(error.message);if(newSubject.levels.length){const {error:linkErr}=await supabase.from("level_subjects").insert(newSubject.levels.map((id:any)=>({level_id:id,subject_id:created.id})));if(linkErr){setMessage(linkErr.message);await load();return;}}setNewSubject({name:"",icon:"📘",levels:[]});setMessage("Matière ajoutée");await load();}}>Ajouter matière</button></div>{data.subjects.map((s:any)=><div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:10,borderBottom:"1px solid #eee"}}>{s.icon} {s.name}<button style={css.btn} onClick={()=>askDelete(s.name,supabase.from("subjects").delete().eq("id",s.id))}>Supprimer</button></div>)}</div>}
 
-              setNc("");
-            } else {
-              setMsg(
-                "Choisissez niveau, matière et titre."
-              );
-            }
-          }}
-        >
-          Ajouter
-        </button>
-      </div>
+        {section === "chapters" && <div style={css.panel}><h2>📖 Gestion des chapitres</h2><div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>{select(form.level_id,(v:any)=>setForm({...form,level_id:v}),data.levels,"Niveau")}{select(form.subject_id,(v:any)=>setForm({...form,subject_id:v}),data.subjects,"Matière")}<input style={css.input} placeholder="Titre du chapitre" value={newChapter} onChange={e=>setNewChapter(e.target.value)}/><button style={css.primary} onClick={()=>{if(!newChapter.trim()||!form.level_id||!form.subject_id)return setMessage("Niveau, matière et titre nécessaires");run(supabase.from("chapters").insert({level_id:+form.level_id,subject_id:+form.subject_id,title:newChapter}),"Chapitre ajouté");setNewChapter("");}}>Ajouter</button></div>{data.chapters.map((c:any)=><div key={c.id} style={{display:"flex",justifyContent:"space-between",padding:10,borderBottom:"1px solid #eee"}}>{c.title} — {nm(data.levels,c.level_id)} / {nm(data.subjects,c.subject_id)}<button style={css.btn} onClick={()=>askDelete(c.title,supabase.from("chapters").delete().eq("id",c.id))}>Supprimer</button></div>)}</div>}
 
-      {chs.map((c: any) => (
-        <div className="row" key={c.id}>
-          <span>{c.title}</span>
+        {section === "ads" && <div style={css.panel}><h2>📢 Gestion des publicités</h2><p>Activez les emplacements et modifiez leur code.</p>{data.ads.map((a:any)=><div key={a.slot} style={{...css.panel,marginBottom:10}}><label><input type="checkbox" checked={!!a.enabled} onChange={e=>run(supabase.from("ads").update({enabled:e.target.checked}).eq("slot",a.slot))}/> <b>{a.label}</b></label><textarea style={{...css.input,width:"100%",marginTop:8}} rows={3} defaultValue={a.code||""} placeholder="Code AdSense facultatif" onBlur={e=>run(supabase.from("ads").update({code:e.target.value}).eq("slot",a.slot))}/></div>)}</div>}
 
-          <button
-            className="del"
-            onClick={() =>
-              ask(
-                c.title,
-                supabase
-                  .from("chapters")
-                  .delete()
-                  .eq("id", c.id)
-              )
-            }
-          >
-            Supprimer
-          </button>
-        </div>
-      ))}
-
-      {/* 4. Matières */}
-      <h2>4. Matières</h2>
-
-      <div className="form">
-        <input
-          placeholder="Nom de la matière"
-          value={ns.name}
-          onChange={(e) =>
-            setNs({ ...ns, name: e.target.value })
-          }
-        />
-
-        <input
-          style={{ width: 70 }}
-          value={ns.icon}
-          onChange={(e) =>
-            setNs({ ...ns, icon: e.target.value })
-          }
-        />
-
-        {D.levels.map((l: any) => (
-          <label key={l.id}>
-            <input
-              type="checkbox"
-              checked={ns.lv.includes(l.id)}
-              onChange={(e) =>
-                setNs({
-                  ...ns,
-                  lv: e.target.checked
-                    ? [...ns.lv, l.id]
-                    : ns.lv.filter(
-                        (x: number) => x !== l.id
-                      ),
-                })
-              }
-            />
-            {l.name}
-          </label>
-        ))}
-
-        <button
-          onClick={async () => {
-            if (!ns.name.trim()) {
-              setMsg("Écrivez le nom de la matière.");
-              return;
-            }
-
-            const { data, error } = await supabase
-              .from("subjects")
-              .insert({
-                name: ns.name,
-                icon: ns.icon,
-              })
-              .select()
-              .single();
-
-            if (error) {
-              setMsg("Erreur : " + error.message);
-              return;
-            }
-
-            if (ns.lv.length > 0) {
-              const { error: linkError } =
-                await supabase
-                  .from("level_subjects")
-                  .insert(
-                    ns.lv.map((l: number) => ({
-                      level_id: l,
-                      subject_id: data.id,
-                    }))
-                  );
-
-              if (linkError) {
-                setMsg(
-                  "Matière ajoutée, mais liaison impossible : " +
-                    linkError.message
-                );
-                await load();
-                return;
-              }
-            }
-
-            setNs({
-              name: "",
-              icon: "📘",
-              lv: [],
-            });
-
-            setMsg("Matière ajoutée ✅");
-            await load();
-          }}
-        >
-          Ajouter la matière
-        </button>
-      </div>
-
-      {D.subjects.map((s: any) => (
-        <div className="row" key={s.id}>
-          <span>
-            {s.icon} {s.name}
-          </span>
-
-          <button
-            className="del"
-            onClick={() =>
-              ask(
-                s.name,
-                supabase
-                  .from("subjects")
-                  .delete()
-                  .eq("id", s.id)
-              )
-            }
-          >
-            Supprimer
-          </button>
-        </div>
-      ))}
-
-      {/* 5. Niveaux */}
-      <h2>5. Niveaux</h2>
-
-      <div className="form">
-        <input
-          placeholder="Nom du niveau"
-          value={nl.name}
-          onChange={(e) =>
-            setNl({ ...nl, name: e.target.value })
-          }
-        />
-
-        <select
-          value={nl.cycle}
-          onChange={(e) =>
-            setNl({ ...nl, cycle: e.target.value })
-          }
-        >
-          <option>Primaire</option>
-          <option>Collège</option>
-          <option>Lycée</option>
-        </select>
-
-        <button
-          onClick={() => {
-            if (!nl.name.trim()) {
-              setMsg("Écrivez le nom du niveau.");
-              return;
-            }
-
-            run(
-              supabase.from("levels").insert({
-                name: nl.name,
-                slug: slug(nl.name),
-                cycle: nl.cycle,
-                position: 100,
-              }),
-              "Niveau ajouté ✅"
-            );
-          }}
-        >
-          Ajouter
-        </button>
-      </div>
-
-      {D.levels.map((l: any) => (
-        <div className="row" key={l.id}>
-          <span>
-            {l.cycle} – {l.name}
-          </span>
-
-          <button
-            className="del"
-            onClick={() =>
-              ask(
-                l.name,
-                supabase
-                  .from("levels")
-                  .delete()
-                  .eq("id", l.id)
-              )
-            }
-          >
-            Supprimer
-          </button>
-        </div>
-      ))}
-
-      {/* 6. Publicités */}
-      <h2>6. Gestion des publicités</h2>
-
-      <p>
-        Activez ou désactivez chaque emplacement.
-        Collez le code fourni par Google AdSense seulement
-        quand votre compte sera validé.
-      </p>
-
-      {D.ads.map((a: any) => (
-        <div
-          className="card"
-          key={a.slot}
-          style={{ marginBottom: 10 }}
-        >
-          <label>
-            <input
-              type="checkbox"
-              checked={a.enabled}
-              onChange={(e) =>
-                run(
-                  supabase
-                    .from("ads")
-                    .update({
-                      enabled: e.target.checked,
-                    })
-                    .eq("slot", a.slot)
-                )
-              }
-            />
-
-            <b>{a.label}</b>
-          </label>
-
-          <textarea
-            style={{
-              width: "100%",
-              marginTop: 8,
-            }}
-            rows={3}
-            placeholder="Code AdSense (facultatif)"
-            defaultValue={a.code}
-            onBlur={(e) =>
-              run(
-                supabase
-                  .from("ads")
-                  .update({ code: e.target.value })
-                  .eq("slot", a.slot)
-              )
-            }
-          />
-        </div>
-      ))}
-    </main>
-  );
+        {(section === "users" || section === "settings") && <div style={css.panel}><h2>{section === "users" ? "♙ Utilisateurs" : "⚙ Paramètres"}</h2><p>Cette rubrique nécessite une table/structure dédiée dans Supabase pour activer les actions. La navigation et l’interface sont en place, mais aucune donnée fictive n’est affichée.</p></div>}
+      </section>
+    </div>
+  </main>;
 }
