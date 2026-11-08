@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -26,6 +27,8 @@ export default function Admin() {
     chapters: [],
     resources: [],
     ads: [],
+    visits: [],
+    downloads: [],
   });
 
   const [f, setF] = useState<any>({ type: TYPES[0] });
@@ -40,27 +43,44 @@ export default function Admin() {
   // Charger les données
   async function load() {
     try {
-      const [levels, subjects, chapters, resources, ads] =
-        await Promise.all([
-          supabase.from("levels").select("*").order("position"),
-          supabase.from("subjects").select("*").order("name"),
-          supabase.from("chapters").select("*").order("title"),
-          supabase.from("resources").select("*").order("created_at"),
-          supabase.from("ads").select("*").order("slot"),
-        ]);
+      const [
+        levels,
+        subjects,
+        chapters,
+        resources,
+        ads,
+        visits,
+        downloads,
+      ] = await Promise.all([
+        supabase.from("levels").select("*").order("position"),
+        supabase.from("subjects").select("*").order("name"),
+        supabase.from("chapters").select("*").order("title"),
+        supabase.from("resources").select("*").order("created_at"),
+        supabase.from("ads").select("*").order("slot"),
+        supabase
+          .from("site_visits")
+          .select("visitor_id,page_path,visited_at"),
+        supabase
+          .from("resource_downloads")
+          .select("resource_id,resource_title,downloaded_at"),
+      ]);
 
       console.log("LOAD LEVELS:", levels.error);
       console.log("LOAD SUBJECTS:", subjects.error);
       console.log("LOAD CHAPTERS:", chapters.error);
       console.log("LOAD RESOURCES:", resources.error);
       console.log("LOAD ADS:", ads.error);
+      console.log("LOAD VISITS:", visits.error);
+      console.log("LOAD DOWNLOADS:", downloads.error);
 
       if (
         levels.error ||
         subjects.error ||
         chapters.error ||
         resources.error ||
-        ads.error
+        ads.error ||
+        visits.error ||
+        downloads.error
       ) {
         setMsg("Erreur de chargement. Consultez la Console.");
       }
@@ -71,6 +91,8 @@ export default function Admin() {
         chapters: chapters.data || [],
         resources: resources.data || [],
         ads: ads.data || [],
+        visits: visits.data || [],
+        downloads: downloads.data || [],
       });
     } catch (error) {
       console.error("LOAD ERROR:", error);
@@ -303,6 +325,38 @@ export default function Admin() {
       c.subject_id == f.subject_id
   );
 
+  // Statistiques du site
+  const totalVisits = D.visits.length;
+
+  const totalVisitors = new Set(
+    D.visits
+      .map((v: any) => v.visitor_id)
+      .filter(Boolean)
+  ).size;
+
+  const totalDownloads = D.downloads.length;
+
+  // Pages les plus visitées
+  const topPages = Object.entries(
+    D.visits.reduce((acc: any, v: any) => {
+      acc[v.page_path] = (acc[v.page_path] || 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 5);
+
+  // Ressources les plus téléchargées
+  const topDownloads = Object.entries(
+    D.downloads.reduce((acc: any, d: any) => {
+      const title = d.resource_title || "Document";
+      acc[title] = (acc[title] || 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a: any, b: any) => b[1] - a[1])
+    .slice(0, 5);
+
   // Tableau de bord Admin
   return (
     <main className="wrap">
@@ -320,6 +374,101 @@ export default function Admin() {
       </button>
 
       {msg && <p className="msg">{msg}</p>}
+
+      {/* DASHBOARD STATISTIQUES */}
+      <h2>📊 Statistiques du site</h2>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: "12px",
+          marginBottom: "25px",
+        }}
+      >
+        {[
+          {
+            title: "Visites totales",
+            value: totalVisits,
+            icon: "👁️",
+          },
+          {
+            title: "Visiteurs uniques",
+            value: totalVisitors,
+            icon: "👥",
+          },
+          {
+            title: "Téléchargements PDF",
+            value: totalDownloads,
+            icon: "📥",
+          },
+        ].map((stat) => (
+          <div
+            key={stat.title}
+            style={{
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: "12px",
+              padding: "18px",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: "28px" }}>{stat.icon}</div>
+
+            <div style={{ fontSize: "26px", fontWeight: 900 }}>
+              {stat.value}
+            </div>
+
+            <div style={{ fontWeight: 700 }}>{stat.title}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pages les plus visitées */}
+      <div className="card" style={{ marginBottom: "20px" }}>
+        <h3>🔥 Pages les plus visitées</h3>
+
+        {topPages.length === 0 ? (
+          <p>Aucune visite enregistrée.</p>
+        ) : (
+          topPages.map(([page, count]: any) => (
+            <div
+              className="row"
+              key={page}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>{page}</span>
+              <b>{count} visites</b>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Ressources les plus téléchargées */}
+      <div className="card" style={{ marginBottom: "25px" }}>
+        <h3>📚 Ressources les plus téléchargées</h3>
+
+        {topDownloads.length === 0 ? (
+          <p>Aucun téléchargement enregistré.</p>
+        ) : (
+          topDownloads.map(([title, count]: any) => (
+            <div
+              className="row"
+              key={title}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <span>{title}</span>
+              <b>{count} téléchargements</b>
+            </div>
+          ))
+        )}
+      </div>
 
       {/* 1. Ressources */}
       <h2>1. Ajouter une ressource (PDF ou image)</h2>
