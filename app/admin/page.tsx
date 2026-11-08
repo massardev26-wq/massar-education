@@ -1,1096 +1,126 @@
+            <div className="left-column">
+              <section className="panel" id="admin-levels"><h2>🎓 Gestion par niveau</h2>
+                <div className="level-groups">
+                  {["Primaire", "Collège", "Lycée"].map((cycle) => <div className={`level-group ${cycle.toLowerCase()}`} key={cycle}>
+                    <h3>{cycle}</h3><div className="level-buttons">{D.levels.filter((l: any) => l.cycle === cycle).map((l: any) =>
+                      <button key={l.id} className={String(activeLevel) === String(l.id) ? "selected" : ""} onClick={() => { setActiveLevel(l.id); setPage(1); }}>{l.name}</button>)}
+                    </div>
+                  </div>)}
+                </div>
+              </section>
 
-"use client";
+              <section className="panel" id="admin-subjects"><h2>📖 {selectedLevel?.name || "Niveau"} – Gestion des matières</h2>
+                <div className="subject-buttons">{D.subjects.map((s: any) => <button key={s.id} className={String(activeSubject) === String(s.id) ? "selected" : ""} onClick={() => { setActiveSubject(s.id); setPage(1); }}>
+                  <span>{s.icon || "📘"}</span>{s.name}</button>)}
+                </div>
+                <div className="resource-tabs">{["Tous", ...TYPES].map((t: string) => <button key={t} className={resourceTab === t ? "selected" : ""} onClick={() => { setResourceTab(t); setPage(1); }}>{t === "Tous" ? "▤ Ressources" : t}</button>)}</div>
+                <div className="resource-toolbar"><button className="primary" onClick={() => setShowAdd(!showAdd)}>＋ Ajouter une ressource</button>
+                  <input placeholder="⌕ Rechercher un titre..." value={resourceSearch} onChange={(e) => { setResourceSearch(e.target.value); setPage(1); }}/>
+                  <select value={resourceTab} onChange={(e) => { setResourceTab(e.target.value); setPage(1); }}><option value="Tous">Tous les types</option>{TYPES.map((t: string) => <option key={t}>{t}</option>)}</select>
+                </div>
+                {showAdd && <div className="add-resource-form">
+                  {sel(f.level_id, (v: any) => setF({ ...f, level_id: v, chapter_id: "" }), D.levels, "Niveau")}
+                  {sel(f.subject_id, (v: any) => setF({ ...f, subject_id: v, chapter_id: "" }), D.subjects, "Matière")}
+                  {sel(f.chapter_id, (v: any) => setF({ ...f, chapter_id: v }), D.chapters.filter((c: any) => c.level_id == f.level_id && c.subject_id == f.subject_id), "Chapitre (facultatif)")}
+                  <select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>{TYPES.map((t: string) => <option key={t}>{t}</option>)}</select>
+                  <input placeholder="Titre" value={f.title || ""} onChange={(e) => setF({ ...f, title: e.target.value })}/>
+                  <input placeholder="Description" value={f.description || ""} onChange={(e) => setF({ ...f, description: e.target.value })}/>
+                  <label className="check-label"><input type="checkbox" checked={!!f.is_premium} onChange={(e) => setF({ ...f, is_premium: e.target.checked })}/> Premium</label>
+                  <input type="file" accept=".pdf,image/*" onChange={(e) => setF({ ...f, file: e.target.files?.[0] })}/>
+                  <button className="primary" onClick={addRes}>Publier</button>
+                </div>}
+                <div className="table-wrap"><table className="resource-table"><thead><tr><th><input type="checkbox" aria-label="Sélectionner"/></th><th>Titre</th><th>Type</th><th>Chapitre</th><th>Date</th><th>Vues</th><th>Téléch.</th><th>Actions</th></tr></thead>
+                  <tbody>{visibleResources.map((r: any) => <tr key={r.id}><td><input type="checkbox" aria-label={`Sélectionner ${r.title}`}/></td>
+                    <td><span className="pdf-icon">PDF</span>{r.title}{r.is_premium ? " 🔒" : ""}</td><td><span className={`type-pill ${slug(r.type || "")}`}>{r.type}</span></td>
+                    <td>{nm(D.chapters, r.chapter_id)}</td><td>{r.created_at ? new Date(r.created_at).toLocaleDateString("fr-FR") : "—"}</td>
+                    <td>◉ {D.visits.filter((v: any) => v.page_path?.includes(String(r.id))).length}</td>
+                    <td className="download-count">⇩ {D.downloads.filter((d: any) => String(d.resource_id) === String(r.id)).length}</td>
+                    <td className="actions"><button title="Modifier" onClick={() => editResource(r)}>✎</button><button title={r.is_premium ? "Rendre gratuit" : "Rendre premium"} onClick={() => run(supabase.from("resources").update({ is_premium: !r.is_premium }).eq("id", r.id))}>▣</button><button title="Supprimer" onClick={() => ask(r.title, supabase.from("resources").delete().eq("id", r.id))}>🗑</button></td>
+                  </tr>)}
+                  {visibleResources.length === 0 && <tr><td colSpan={8} className="empty">Aucune ressource pour cette sélection.</td></tr>}
+                  </tbody></table></div>
+                <div className="table-footer"><span>Afficher {filteredResources.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filteredResources.length)} sur {filteredResources.length} éléments</span>
+                  <div><button disabled={page === 1} onClick={() => setPage(page - 1)}>‹</button>{Array.from({ length: pagesCount }, (_, i) => i + 1).slice(0, 5).map((p) => <button key={p} className={page === p ? "current" : ""} onClick={() => setPage(p)}>{p}</button>)}<button disabled={page === pagesCount} onClick={() => setPage(page + 1)}>›</button></div>
+                </div>
+              </section>
 
-import { useEffect, useState } from "react";
-import { supabase, TYPES } from "@/lib/supabase";
+              <section className="panel" id="admin-chapters"><h2>📖 Gestion des chapitres</h2><div className="form-grid">
+                {sel(f.level_id, (v: any) => setF({ ...f, level_id: v }), D.levels, "Niveau")}
+                {sel(f.subject_id, (v: any) => setF({ ...f, subject_id: v }), D.subjects, "Matière")}
+                <input placeholder="Titre du chapitre" value={nc} onChange={(e) => setNc(e.target.value)}/>
+                <button className="primary" onClick={() => { if (nc && f.level_id && f.subject_id) { run(supabase.from("chapters").insert({ level_id: +f.level_id, subject_id: +f.subject_id, title: nc }), "Chapitre ajouté ✅"); setNc(""); } else setMsg("Choisissez niveau, matière et titre."); }}>Ajouter</button>
+              </div>{D.chapters.map((c: any) => <div className="simple-row" key={c.id}><span>{c.title} · {nm(D.levels, c.level_id)}</span><button className="danger" onClick={() => ask(c.title, supabase.from("chapters").delete().eq("id", c.id))}>Supprimer</button></div>)}</section>
 
-const slug = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+              <section className="panel" id="admin-subject-management"><h2>📚 Gestion des matières</h2><div className="form-grid">
+                <input placeholder="Nom de la matière" value={ns.name} onChange={(e) => setNs({ ...ns, name: e.target.value })}/><input style={{ width: 75 }} value={ns.icon} onChange={(e) => setNs({ ...ns, icon: e.target.value })} placeholder="Icône"/>
+                <button className="primary" onClick={async () => { if (!ns.name.trim()) { setMsg("Écrivez le nom de la matière."); return; }
+                  const { data, error } = await supabase.from("subjects").insert({ name: ns.name, icon: ns.icon }).select().single();
+                  if (error) { setMsg("Erreur : " + error.message); return; }
+                  setNs({ name: "", icon: "📘", lv: [] }); setMsg("Matière ajoutée ✅"); await load();
+                }}>Ajouter la matière</button>
+              </div>{D.subjects.map((s: any) => <div className="simple-row" key={s.id}><span>{s.icon} {s.name}</span><button className="danger" onClick={() => ask(s.name, supabase.from("subjects").delete().eq("id", s.id))}>Supprimer</button></div>)}</section>
 
-const nm = (a: any[], id: any) =>
-  a.find((x) => x.id === id)?.name || "?";
+              <section className="panel" id="admin-level-management"><h2>🎓 Gestion des niveaux</h2><div className="form-grid">
+                <input placeholder="Nom du niveau" value={nl.name} onChange={(e) => setNl({ ...nl, name: e.target.value })}/>
+                <select value={nl.cycle} onChange={(e) => setNl({ ...nl, cycle: e.target.value })}><option>Primaire</option><option>Collège</option><option>Lycée</option></select>
+                <button className="primary" onClick={() => { if (!nl.name.trim()) { setMsg("Écrivez le nom du niveau."); return; } run(supabase.from("levels").insert({ name: nl.name, slug: slug(nl.name), cycle: nl.cycle, position: 100 }), "Niveau ajouté ✅"); }}>Ajouter</button>
+              </div>{D.levels.map((l: any) => <div className="simple-row" key={l.id}><span>{l.cycle} — {l.name}</span><button className="danger" onClick={() => ask(l.name, supabase.from("levels").delete().eq("id", l.id))}>Supprimer</button></div>)}</section>
 
-export default function Admin() {
-  const [st, setSt] = useState("load");
-  const [em, setEm] = useState("");
-  const [pw, setPw] = useState("");
-  const [msg, setMsg] = useState("");
+              <section className="panel" id="admin-ads"><h2>📢 Gestion des publicités</h2><p className="muted">Activez/désactivez les emplacements. Ajoutez votre code AdSense lorsque le compte sera validé.</p>
+                {D.ads.map((a: any) => <div className="ad-card" key={a.slot}><label><input type="checkbox" checked={a.enabled} onChange={(e) => run(supabase.from("ads").update({ enabled: e.target.checked }).eq("slot", a.slot))}/> <b>{a.label}</b></label>
+                  <textarea rows={3} defaultValue={a.code} placeholder="Code AdSense (facultatif)" onBlur={(e) => run(supabase.from("ads").update({ code: e.target.value }).eq("slot", a.slot))}/></div>)}
+              </section>
+            </div>
 
-  const [D, setD] = useState<any>({
-    levels: [],
-    subjects: [],
-    chapters: [],
-    resources: [],
-    ads: [],
-    visits: [],
-    downloads: [],
-  });
+            <aside className="right-column">
+              <section className="panel chart-panel" id="admin-stats"><h2>▥ Statistiques générales</h2><div className="chart-legend"><span>Visites du site</span><b>{totalVisits.toLocaleString("fr-FR")}</b></div>
+                <svg viewBox="0 0 330 180" role="img" aria-label="Graphique des visites"><defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2b83f6" stopOpacity=".35"/><stop offset="100%" stopColor="#2b83f6" stopOpacity=".03"/></linearGradient></defs>
+                  {[25,60,95,130,155].map((y) => <line key={y} x1="35" x2="315" y1={y} y2={y} stroke="#e4ebf6" strokeWidth="1"/>)}
+                  <path d="M35 145 C70 130 75 120 105 110 S150 90 175 80 S220 75 245 55 S285 40 315 28 L315 155 L35 155 Z" fill="url(#chartFill)"/>
+                  <path d="M35 145 C70 130 75 120 105 110 S150 90 175 80 S220 75 245 55 S285 40 315 28" fill="none" stroke="#1677f2" strokeWidth="3" strokeLinecap="round"/>
+                  {[35,105,175,245,315].map((x, i) => <circle key={x} cx={x} cy={[145,110,80,55,28][i]} r="4" fill="white" stroke="#1677f2" strokeWidth="2"/>)}
+                  <text x="35" y="174">01/10</text><text x="105" y="174">15/10</text><text x="175" y="174">22/10</text><text x="245" y="174">05/11</text><text x="300" y="174">08/11</text>
+                </svg>
+              </section>
+              <section className="panel top-downloads"><h2>🏆 Top 5 des téléchargements</h2>{topDownloads.length ? topDownloads.map(([title, count]: any, i: number) => <div className="rank-row" key={title}><span className="rank">{i + 1}</span><span className="pdf-icon">PDF</span><span className="rank-title">{title}</span><b>{count}</b><span className="green-arrow">⇩</span></div>) : <p className="muted">Aucun téléchargement enregistré.</p>}</section>
+              <section className="panel type-panel"><h2>▤ Répartition par type</h2><div className="donut-layout"><div className="donut" style={{ background: `conic-gradient(${typeCounts.map((x, i) => { const colors = ["#1677f2", "#28c840", "#913df4", "#ff9900", "#aab4c5"]; const start = typeCounts.slice(0, i).reduce((a, b) => a + b.count, 0) / typeTotal * 100; const end = (start + x.count / typeTotal * 100); return `${colors[i % colors.length]} ${start}% ${end}%`; }).join(",")})` }}><div><strong>{D.resources.length}</strong><span>Ressources</span></div></div>
+                  <div className="type-legend">{typeCounts.map((x, i) => <div key={x.type}><i style={{ background: ["#1677f2", "#28c840", "#913df4", "#ff9900", "#aab4c5"][i % 5] }}/><span>{x.type}</span><b>{x.count} ({Math.round(x.count / typeTotal * 100)}%)</b></div>)}</div></div>
+              </section>
+              <section className="panel top-pages"><h2>🔥 Pages les plus visitées</h2>{topPages.length ? topPages.map(([path, count]: any) => <div className="simple-row" key={path}><span>{path || "/"}</span><b>{count}</b></div>) : <p className="muted">Aucune visite enregistrée.</p>}</section>
+            </aside>
+          </div>
 
-  const [f, setF] = useState<any>({ type: TYPES[0] });
-  const [nl, setNl] = useState({ name: "", cycle: "Primaire" });
-  const [ns, setNs] = useState<any>({
-    name: "",
-    icon: "📘",
-    lv: [],
-  });
-  const [nc, setNc] = useState("");
-  const [editingResource, setEditingResource] = useState<any>(null);
-  const [editForm, setEditForm] = useState<any>({ title: "", type: TYPES[0], level_id: "" });
-  const [visitorSearch, setVisitorSearch] = useState("");
-  const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(null);
-
-  // Charger les données
-  async function load() {
-    try {
-      const [
-        levels,
-        subjects,
-        chapters,
-        resources,
-        ads,
-        visits,
-        downloads,
-      ] = await Promise.all([
-        supabase.from("levels").select("*").order("position"),
-        supabase.from("subjects").select("*").order("name"),
-        supabase.from("chapters").select("*").order("title"),
-        supabase.from("resources").select("*").order("created_at"),
-        supabase.from("ads").select("*").order("slot"),
-        supabase
-          .from("site_visits")
-          .select("visitor_id,page_path,visited_at"),
-        supabase
-          .from("resource_downloads")
-          .select("resource_id,resource_title,downloaded_at"),
-      ]);
-
-      console.log("LOAD LEVELS:", levels.error);
-      console.log("LOAD SUBJECTS:", subjects.error);
-      console.log("LOAD CHAPTERS:", chapters.error);
-      console.log("LOAD RESOURCES:", resources.error);
-      console.log("LOAD ADS:", ads.error);
-      console.log("LOAD VISITS:", visits.error);
-      console.log("LOAD DOWNLOADS:", downloads.error);
-
-      if (
-        levels.error ||
-        subjects.error ||
-        chapters.error ||
-        resources.error ||
-        ads.error ||
-        visits.error ||
-        downloads.error
-      ) {
-        setMsg("Erreur de chargement. Consultez la Console.");
-      }
-
-      setD({
-        levels: levels.data || [],
-        subjects: subjects.data || [],
-        chapters: chapters.data || [],
-        resources: resources.data || [],
-        ads: ads.data || [],
-        visits: visits.data || [],
-        downloads: downloads.data || [],
-      });
-    } catch (error) {
-      console.error("LOAD ERROR:", error);
-      setMsg("Erreur lors du chargement des données.");
-    }
-  }
-
-  // Vérifier si l'utilisateur est administrateur
-  async function check() {
-    setSt("load");
-    setMsg("");
-
-    try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      console.log("USER:", user);
-      console.log("USER ERROR:", userError);
-
-      if (userError) {
-        setMsg("Erreur utilisateur : " + userError.message);
-      }
-
-      if (!user) {
-        setSt("out");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("admins")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      console.log("ADMIN USER ID:", user.id);
-      console.log("ADMIN DATA:", data);
-      console.log("ADMIN ERROR:", error);
-
-      if (error) {
-        setMsg("Erreur Admin : " + error.message);
-        setSt("no");
-        return;
-      }
-
-      if (data) {
-        setSt("ok");
-        await load();
-      } else {
-        setMsg("Aucun accès administrateur trouvé pour ce compte.");
-        setSt("no");
-      }
-    } catch (error) {
-      console.error("CHECK ERROR:", error);
-      setMsg("Erreur de vérification.");
-      setSt("out");
-    }
-  }
-
-  useEffect(() => {
-    check();
-  }, []);
-
-  // Exécuter une opération
-  async function run(
-    p: any,
-    ok = "Enregistré ✅"
-  ) {
-    const { error } = await p;
-
-    if (error) {
-      console.error("DATABASE ERROR:", error);
-      setMsg("Erreur : " + error.message);
-    } else {
-      setMsg(ok);
-    }
-
-    await load();
-  }
-
-  // Connexion
-  async function login() {
-    setMsg("");
-
-    if (!em || !pw) {
-      setMsg("Veuillez saisir votre email et votre mot de passe.");
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email: em.trim(),
-      password: pw,
-    });
-
-    if (error) {
-      console.error("LOGIN ERROR:", error);
-      setMsg("Connexion impossible : " + error.message);
-      return;
-    }
-
-    await check();
-  }
-
-  // Ajouter une ressource PDF ou image
-  async function addRes() {
-    if (!f.level_id || !f.subject_id || !f.title) {
-      setMsg(
-        "Choisissez le niveau, la matière et écrivez un titre."
-      );
-      return;
-    }
-
-    let file_url = null;
-
-    if (f.file) {
-      const path =
-        Date.now() +
-        "-" +
-        slug(f.file.name.replace(/\.[^.]+$/, "")) +
-        "." +
-        f.file.name.split(".").pop();
-
-      const { error } = await supabase.storage
-        .from("files")
-        .upload(path, f.file);
-
-      if (error) {
-        console.error("UPLOAD ERROR:", error);
-        setMsg("Erreur d’envoi du fichier : " + error.message);
-        return;
-      }
-
-      file_url = supabase.storage
-        .from("files")
-        .getPublicUrl(path).data.publicUrl;
-    }
-
-    await run(
-      supabase.from("resources").insert({
-        level_id: +f.level_id,
-        subject_id: +f.subject_id,
-        chapter_id: f.chapter_id ? +f.chapter_id : null,
-        type: f.type,
-        title: f.title,
-        description: f.description || null,
-        is_premium: !!f.is_premium,
-        file_url,
-      }),
-      "Ressource publiée ✅"
-    );
-
-    setF({ type: TYPES[0] });
-  }
-
-  // Modifier le titre, le type et le niveau d'une ressource
-  function editResource(r: any) {
-    setEditingResource(r);
-    setEditForm({ title: r.title || "", type: r.type || TYPES[0], level_id: String(r.level_id ?? "") });
-  }
-
-  async function saveResourceEdit() {
-    if (!editingResource) return;
-    if (!editForm.title.trim() || !editForm.type || !editForm.level_id) {
-      setMsg("Veuillez renseigner le titre, le type et le niveau.");
-      return;
-    }
-    const changedLevel = String(editForm.level_id) !== String(editingResource.level_id);
-    const update: any = {
-      title: editForm.title.trim(),
-      type: editForm.type,
-      level_id: Number(editForm.level_id),
-    };
-    // Le chapitre appartient à un niveau; le vider si on change le niveau.
-    if (changedLevel) update.chapter_id = null;
-    const { error } = await supabase.from("resources").update(update).eq("id", editingResource.id);
-    if (error) {
-      setMsg("Erreur modification : " + error.message);
-      return;
-    }
-    setMsg("Ressource modifiée ✅");
-    setEditingResource(null);
-    await load();
-  }
-
-  // Sélecteur
-  const sel = (
-    v: any,
-    on: any,
-    items: any[],
-    ph: string
-  ) => (
-    <select
-      value={v || ""}
-      onChange={(e) => on(e.target.value)}
-    >
-      <option value="">{ph}</option>
-      {items.map((i) => (
-        <option key={i.id} value={i.id}>
-          {i.name || i.title}
-        </option>
-      ))}
-    </select>
-  );
-
-  // Confirmation suppression
-  const ask = (t: string, p: any) =>
-    confirm("Supprimer définitivement : " + t + " ?") &&
-    run(p, "Supprimé ✅");
-
-  // Chargement
-  if (st === "load") {
-    return (
-      <main className="wrap">
-        <p>Chargement…</p>
+          <section className="panel visitor-panel" id="admin-visitors"><h2>👥 Visiteurs détaillés ({totalVisitors})</h2><p className="muted">Identifiant anonyme du navigateur, visites et historique. Ces données ne révèlent pas l’identité personnelle.</p>
+            <input className="search-wide" placeholder="Rechercher par Visitor ID…" value={visitorSearch} onChange={(e) => setVisitorSearch(e.target.value)}/>
+            <div className="table-wrap"><table><thead><tr>{["Visitor ID", "Visites", "Pages consultées", "Première visite", "Dernière visite", "Détail"].map((h) => <th key={h}>{h}</th>)}</tr></thead><tbody>
+              {visitorRows.map((v: any) => <tr key={v.id}><td>{v.id}</td><td>{v.count}</td><td>{Array.from(v.pages).join(", ")}</td><td>{new Date(v.first).toLocaleString("fr-FR")}</td><td>{new Date(v.last).toLocaleString("fr-FR")}</td><td><button onClick={() => setSelectedVisitorId(selectedVisitorId === v.id ? null : v.id)}>{selectedVisitorId === v.id ? "Masquer" : "Voir détail"}</button></td></tr>)}
+            </tbody></table></div>
+            {selectedVisitorId && <div className="history"><h3>Historique : {selectedVisitorId}</h3>{selectedVisitorHistory.map((v: any, i: number) => <div key={`${v.visited_at}-${i}`} className="simple-row"><span>{v.page_path || "/"} · {new Date(v.visited_at).toLocaleString("fr-FR")}</span></div>)}</div>}
+          </section>
+          <section className="panel visitor-panel"><h2>📥 Historique des téléchargements ({totalDownloads})</h2><div className="table-wrap"><table><thead><tr><th>Document</th><th>Resource ID</th><th>Date / heure</th></tr></thead><tbody>{D.downloads.slice(0, 300).map((d: any, i: number) => <tr key={`${d.downloaded_at}-${i}`}><td>{d.resource_title || "Document"}</td><td>{d.resource_id ?? "—"}</td><td>{new Date(d.downloaded_at).toLocaleString("fr-FR")}</td></tr>)}</tbody></table></div></section>
+        </section>
       </main>
-    );
-  }
 
-  // Connexion et vérification Admin
-  if (st !== "ok") {
-    return (
-      <main className="wrap">
-        <h1>Administration</h1>
+      {editingResource && <div className="modal-backdrop"><div className="modal-card"><h2>✏️ Modifier la ressource</h2><label>Titre</label><input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}/>
+        <label>Type</label><select value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>{[...new Set([...TYPES, editForm.type].filter(Boolean))].map((t: any) => <option key={t}>{t}</option>)}</select>
+        <label>Niveau</label><select value={editForm.level_id} onChange={(e) => setEditForm({ ...editForm, level_id: e.target.value })}><option value="">Choisir un niveau</option>{D.levels.map((l: any) => <option key={l.id} value={String(l.id)}>{l.cycle} — {l.name}</option>)}</select>
+        <div className="modal-actions"><button onClick={() => setEditingResource(null)}>Annuler</button><button className="primary" onClick={saveResourceEdit}>Enregistrer</button></div>
+      </div></div>}
 
-        {st === "no" && (
-          <p className="msg">
-            Ce compte n’est pas administrateur.
-          </p>
-        )}
-
-        <div className="form">
-          <input
-            type="email"
-            placeholder="Email"
-            value={em}
-            onChange={(e) => setEm(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Mot de passe"
-            value={pw}
-            onChange={(e) => setPw(e.target.value)}
-          />
-
-          <button onClick={login}>
-            Se connecter
-          </button>
-        </div>
-
-        {msg && <p className="msg">{msg}</p>}
-      </main>
-    );
-  }
-
-  const chs = D.chapters.filter(
-    (c: any) =>
-      c.level_id == f.level_id &&
-      c.subject_id == f.subject_id
-  );
-
-  // Statistiques du site
-  const totalVisits = D.visits.length;
-
-  const totalVisitors = new Set(
-    D.visits
-      .map((v: any) => v.visitor_id)
-      .filter(Boolean)
-  ).size;
-
-  const totalDownloads = D.downloads.length;
-
-  // Pages les plus visitées
-  const topPages = Object.entries(
-    D.visits.reduce((acc: any, v: any) => {
-      acc[v.page_path] = (acc[v.page_path] || 0) + 1;
-      return acc;
-    }, {})
-  )
-    .sort((a: any, b: any) => b[1] - a[1])
-    .slice(0, 5);
-
-  // Ressources les plus téléchargées
-  const topDownloads = Object.entries(
-    D.downloads.reduce((acc: any, d: any) => {
-      const title = d.resource_title || "Document";
-      acc[title] = (acc[title] || 0) + 1;
-      return acc;
-    }, {})
-  )
-    .sort((a: any, b: any) => b[1] - a[1])
-    .slice(0, 5);
-
-  // Grouper les visites par identifiant anonyme du navigateur
-  const visitorRows = Object.entries(
-    D.visits.reduce((acc: any, v: any) => {
-      const id = v.visitor_id || "Sans identifiant";
-      if (!acc[id]) acc[id] = { id, count: 0, pages: new Set(), first: v.visited_at, last: v.visited_at };
-      acc[id].count += 1;
-      acc[id].pages.add(v.page_path || "/");
-      if (new Date(v.visited_at).getTime() < new Date(acc[id].first).getTime()) acc[id].first = v.visited_at;
-      if (new Date(v.visited_at).getTime() > new Date(acc[id].last).getTime()) acc[id].last = v.visited_at;
-      return acc;
-    }, {})
-  )
-    .filter(([id]: any) => String(id).toLowerCase().includes(visitorSearch.toLowerCase()))
-    .sort((a: any, b: any) => b[1].count - a[1].count)
-    .map(([_, row]: any) => row);
-
-  const selectedVisitorHistory = selectedVisitorId
-    ? D.visits.filter((v: any) => (v.visitor_id || "Sans identifiant") === selectedVisitorId)
-        .sort((a: any, b: any) => new Date(b.visited_at).getTime() - new Date(a.visited_at).getTime())
-    : [];
-
-  // Tableau de bord Admin
-  return (
-    <>
-    <main className="massar-admin-shell">
-      <aside className="massar-admin-sidebar">
-        <div className="massar-brand">📚<strong>Association <span>Massar</span></strong><small>Espace Administrateur</small></div>
-        <nav>
-          <a href="#admin-dashboard">🏠 Tableau de bord</a>
-          <a href="#admin-levels">🎓 Niveaux</a>
-          <a href="#admin-subjects">📚 Matières</a>
-          <a href="#admin-resources">📄 Ressources</a>
-          <a href="#admin-chapters">📖 Chapitres</a>
-          <a href="#admin-ads">📢 Publicités</a>
-          <a href="#admin-stats">📊 Statistiques</a>
-          <a href="#admin-visitors">👥 Utilisateurs</a>
-        </nav>
-      </aside>
-      <div className="massar-admin-main wrap">
-      <h1 id="admin-dashboard">Tableau de bord – <span>Association Massar</span></h1>
-
-      <button
-        className="alt"
-        onClick={async () => {
-          await supabase.auth.signOut();
-          setSt("out");
-          setMsg("");
-        }}
-      >
-        Se déconnecter
-      </button>
-
-      {msg && <p className="msg">{msg}</p>}
-
-      {/* DASHBOARD STATISTIQUES */}
-      <h2 id="admin-stats">📊 Statistiques du site</h2>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "12px",
-          marginBottom: "25px",
-        }}
-      >
-        {[
-          {
-            title: "Visites totales",
-            value: totalVisits,
-            icon: "👁️",
-          },
-          {
-            title: "Visiteurs uniques",
-            value: totalVisitors,
-            icon: "👥",
-          },
-          {
-            title: "Téléchargements PDF",
-            value: totalDownloads,
-            icon: "📥",
-          },
-        ].map((stat) => (
-          <div
-            key={stat.title}
-            style={{
-              background: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-              borderRadius: "12px",
-              padding: "18px",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: "28px" }}>{stat.icon}</div>
-
-            <div style={{ fontSize: "26px", fontWeight: 900 }}>
-              {stat.value}
-            </div>
-
-            <div style={{ fontWeight: 700 }}>{stat.title}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Pages les plus visitées */}
-      <div className="card" style={{ marginBottom: "20px" }}>
-        <h3>🔥 Pages les plus visitées</h3>
-
-        {topPages.length === 0 ? (
-          <p>Aucune visite enregistrée.</p>
-        ) : (
-          topPages.map(([page, count]: any) => (
-            <div
-              className="row"
-              key={page}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
-              <span>{page}</span>
-              <b>{count} visites</b>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Ressources les plus téléchargées */}
-      <div className="card" style={{ marginBottom: "25px" }}>
-        <h3>📚 Ressources les plus téléchargées</h3>
-
-        {topDownloads.length === 0 ? (
-          <p>Aucun téléchargement enregistré.</p>
-        ) : (
-          topDownloads.map(([title, count]: any) => (
-            <div
-              className="row"
-              key={title}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
-              <span>{title}</span>
-              <b>{count} téléchargements</b>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Visiteurs détaillés et historique de téléchargement */}
-      <div className="card" style={{ marginBottom: "22px" }}>
-        <h2 id="admin-visitors">👥 Visiteurs détaillés ({totalVisitors})</h2>
-        <p>Identifiant anonyme du navigateur, nombre de visites, pages consultées et dates. Ces données ne donnent pas l'identité personnelle du visiteur.</p>
-        <input
-          placeholder="Rechercher par Visitor ID…"
-          value={visitorSearch}
-          onChange={(e) => setVisitorSearch(e.target.value)}
-          style={{ width: "100%", marginBottom: 12 }}
-        />
-        {visitorRows.length === 0 ? <p>Aucun visiteur trouvé.</p> : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{["Visitor ID", "Visites", "Pages consultées", "Première visite", "Dernière visite", "Détail"].map((h) => <th key={h} style={{ textAlign: "left", padding: 8 }}>{h}</th>)}</tr></thead>
-              <tbody>{visitorRows.map((v: any) => <tr key={v.id}>
-                <td style={{ padding: 8, borderTop: "1px solid #ddd", wordBreak: "break-all", fontSize: 12 }}>{v.id}</td>
-                <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{v.count}</td>
-                <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{Array.from(v.pages).join(", ")}</td>
-                <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{new Date(v.first).toLocaleString("fr-FR")}</td>
-                <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{new Date(v.last).toLocaleString("fr-FR")}</td>
-                <td style={{ padding: 8, borderTop: "1px solid #ddd" }}><button className="alt" onClick={() => setSelectedVisitorId(selectedVisitorId === v.id ? null : v.id)}>{selectedVisitorId === v.id ? "Masquer" : "Voir détail"}</button></td>
-              </tr>)}</tbody>
-            </table>
-          </div>
-        )}
-        {selectedVisitorId && <div style={{ marginTop: 14, padding: 12, background: "#f8fafc", borderRadius: 10 }}>
-          <h3>Historique du visiteur : {selectedVisitorId}</h3>
-          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr>{["Page", "Date", "Heure"].map((h) => <th key={h} style={{ textAlign: "left", padding: 8 }}>{h}</th>)}</tr></thead>
-            <tbody>{selectedVisitorHistory.map((v: any, i: number) => <tr key={`${v.visited_at}-${i}`}>
-              <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{v.page_path || "/"}</td>
-              <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{new Date(v.visited_at).toLocaleDateString("fr-FR")}</td>
-              <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{new Date(v.visited_at).toLocaleTimeString("fr-FR")}</td>
-            </tr>)}</tbody>
-          </table></div>
-        </div>}
-      </div>
-
-      <div className="card" style={{ marginBottom: "22px" }}>
-        <h2>📥 Historique détaillé des téléchargements ({totalDownloads})</h2>
-        {D.downloads.length === 0 ? <p>Aucun téléchargement enregistré.</p> : <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead><tr>{["Document téléchargé", "Resource ID", "Date / heure"].map((h) => <th key={h} style={{ textAlign: "left", padding: 8 }}>{h}</th>)}</tr></thead>
-            <tbody>{D.downloads.slice(0, 300).map((d: any, i: number) => <tr key={`${d.downloaded_at}-${i}`}>
-              <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{d.resource_title || "Document"}</td>
-              <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{d.resource_id ?? "—"}</td>
-              <td style={{ padding: 8, borderTop: "1px solid #ddd" }}>{new Date(d.downloaded_at).toLocaleString("fr-FR")}</td>
-            </tr>)}</tbody>
-          </table>
-        </div>}
-      </div>
-
-      {/* 1. Ressources */}
-      <h2 id="admin-resources">📄 Gestion des ressources – Ajouter</h2>
-
-      <div className="form">
-        {sel(
-          f.level_id,
-          (v: any) =>
-            setF({ ...f, level_id: v, chapter_id: "" }),
-          D.levels,
-          "Niveau"
-        )}
-
-        {sel(
-          f.subject_id,
-          (v: any) =>
-            setF({ ...f, subject_id: v, chapter_id: "" }),
-          D.subjects,
-          "Matière"
-        )}
-
-        {sel(
-          f.chapter_id,
-          (v: any) => setF({ ...f, chapter_id: v }),
-          chs,
-          "Chapitre (facultatif)"
-        )}
-
-        <select
-          value={f.type}
-          onChange={(e) =>
-            setF({ ...f, type: e.target.value })
-          }
-        >
-          {TYPES.map((t: string) => (
-            <option key={t}>{t}</option>
-          ))}
-        </select>
-
-        <input
-          placeholder="Titre"
-          value={f.title || ""}
-          onChange={(e) =>
-            setF({ ...f, title: e.target.value })
-          }
-        />
-
-        <input
-          placeholder="Description"
-          value={f.description || ""}
-          onChange={(e) =>
-            setF({ ...f, description: e.target.value })
-          }
-        />
-
-        <label>
-          <input
-            type="checkbox"
-            checked={!!f.is_premium}
-            onChange={(e) =>
-              setF({
-                ...f,
-                is_premium: e.target.checked,
-              })
-            }
-          />
-          Premium
-        </label>
-
-        <input
-          type="file"
-          accept=".pdf,image/*"
-          onChange={(e) =>
-            setF({
-              ...f,
-              file: e.target.files?.[0],
-            })
-          }
-        />
-
-        <button onClick={addRes}>
-          Publier
-        </button>
-      </div>
-
-      {/* 2. Ressources publiées */}
-      <h2>
-        2. Ressources publiées ({D.resources.length})
-      </h2>
-
-      {D.resources
-        .slice()
-        .reverse()
-        .map((r: any) => (
-          <div className="row" key={r.id}>
-            <span>
-              <b>{r.title}</b> – {nm(D.levels, r.level_id)} /
-              {nm(D.subjects, r.subject_id)} / {r.type}
-              {r.is_premium ? " 🔒" : ""}
-            </span>
-
-            <span>
-              <button className="alt" onClick={() => editResource(r)}>
-                Modifier contenu
-              </button>{" "}
-
-              <button
-                className="alt"
-                onClick={() =>
-                  run(
-                    supabase
-                      .from("resources")
-                      .update({
-                        is_premium: !r.is_premium,
-                      })
-                      .eq("id", r.id)
-                  )
-                }
-              >
-                {r.is_premium
-                  ? "Rendre gratuit"
-                  : "Rendre premium"}
-              </button>{" "}
-
-              <button
-                className="del"
-                onClick={() =>
-                  ask(
-                    r.title,
-                    supabase
-                      .from("resources")
-                      .delete()
-                      .eq("id", r.id)
-                  )
-                }
-              >
-                Supprimer
-              </button>
-            </span>
-          </div>
-        ))}
-
-      {/* 3. Chapitres */}
-      <h2 id="admin-chapters">📖 Chapitres</h2>
-
-      <div className="form">
-        {sel(
-          f.level_id,
-          (v: any) => setF({ ...f, level_id: v }),
-          D.levels,
-          "Niveau"
-        )}
-
-        {sel(
-          f.subject_id,
-          (v: any) => setF({ ...f, subject_id: v }),
-          D.subjects,
-          "Matière"
-        )}
-
-        <input
-          placeholder="Titre du chapitre"
-          value={nc}
-          onChange={(e) => setNc(e.target.value)}
-        />
-
-        <button
-          onClick={() => {
-            if (nc && f.level_id && f.subject_id) {
-              run(
-                supabase.from("chapters").insert({
-                  level_id: +f.level_id,
-                  subject_id: +f.subject_id,
-                  title: nc,
-                }),
-                "Chapitre ajouté ✅"
-              );
-
-              setNc("");
-            } else {
-              setMsg(
-                "Choisissez niveau, matière et titre."
-              );
-            }
-          }}
-        >
-          Ajouter
-        </button>
-      </div>
-
-      {chs.map((c: any) => (
-        <div className="row" key={c.id}>
-          <span>{c.title}</span>
-
-          <button
-            className="del"
-            onClick={() =>
-              ask(
-                c.title,
-                supabase
-                  .from("chapters")
-                  .delete()
-                  .eq("id", c.id)
-              )
-            }
-          >
-            Supprimer
-          </button>
-        </div>
-      ))}
-
-      {/* 4. Matières */}
-      <h2 id="admin-subjects">📚 Matières</h2>
-
-      <div className="form">
-        <input
-          placeholder="Nom de la matière"
-          value={ns.name}
-          onChange={(e) =>
-            setNs({ ...ns, name: e.target.value })
-          }
-        />
-
-        <input
-          style={{ width: 70 }}
-          value={ns.icon}
-          onChange={(e) =>
-            setNs({ ...ns, icon: e.target.value })
-          }
-        />
-
-        {D.levels.map((l: any) => (
-          <label key={l.id}>
-            <input
-              type="checkbox"
-              checked={ns.lv.includes(l.id)}
-              onChange={(e) =>
-                setNs({
-                  ...ns,
-                  lv: e.target.checked
-                    ? [...ns.lv, l.id]
-                    : ns.lv.filter(
-                        (x: number) => x !== l.id
-                      ),
-                })
-              }
-            />
-            {l.name}
-          </label>
-        ))}
-
-        <button
-          onClick={async () => {
-            if (!ns.name.trim()) {
-              setMsg("Écrivez le nom de la matière.");
-              return;
-            }
-
-            const { data, error } = await supabase
-              .from("subjects")
-              .insert({
-                name: ns.name,
-                icon: ns.icon,
-              })
-              .select()
-              .single();
-
-            if (error) {
-              setMsg("Erreur : " + error.message);
-              return;
-            }
-
-            if (ns.lv.length > 0) {
-              const { error: linkError } =
-                await supabase
-                  .from("level_subjects")
-                  .insert(
-                    ns.lv.map((l: number) => ({
-                      level_id: l,
-                      subject_id: data.id,
-                    }))
-                  );
-
-              if (linkError) {
-                setMsg(
-                  "Matière ajoutée, mais liaison impossible : " +
-                    linkError.message
-                );
-                await load();
-                return;
-              }
-            }
-
-            setNs({
-              name: "",
-              icon: "📘",
-              lv: [],
-            });
-
-            setMsg("Matière ajoutée ✅");
-            await load();
-          }}
-        >
-          Ajouter la matière
-        </button>
-      </div>
-
-      {D.subjects.map((s: any) => (
-        <div className="row" key={s.id}>
-          <span>
-            {s.icon} {s.name}
-          </span>
-
-          <button
-            className="del"
-            onClick={() =>
-              ask(
-                s.name,
-                supabase
-                  .from("subjects")
-                  .delete()
-                  .eq("id", s.id)
-              )
-            }
-          >
-            Supprimer
-          </button>
-        </div>
-      ))}
-
-      {/* 5. Niveaux */}
-      <h2 id="admin-levels">🎓 Niveaux</h2>
-
-      <div className="form">
-        <input
-          placeholder="Nom du niveau"
-          value={nl.name}
-          onChange={(e) =>
-            setNl({ ...nl, name: e.target.value })
-          }
-        />
-
-        <select
-          value={nl.cycle}
-          onChange={(e) =>
-            setNl({ ...nl, cycle: e.target.value })
-          }
-        >
-          <option>Primaire</option>
-          <option>Collège</option>
-          <option>Lycée</option>
-        </select>
-
-        <button
-          onClick={() => {
-            if (!nl.name.trim()) {
-              setMsg("Écrivez le nom du niveau.");
-              return;
-            }
-
-            run(
-              supabase.from("levels").insert({
-                name: nl.name,
-                slug: slug(nl.name),
-                cycle: nl.cycle,
-                position: 100,
-              }),
-              "Niveau ajouté ✅"
-            );
-          }}
-        >
-          Ajouter
-        </button>
-      </div>
-
-      {D.levels.map((l: any) => (
-        <div className="row" key={l.id}>
-          <span>
-            {l.cycle} – {l.name}
-          </span>
-
-          <button
-            className="del"
-            onClick={() =>
-              ask(
-                l.name,
-                supabase
-                  .from("levels")
-                  .delete()
-                  .eq("id", l.id)
-              )
-            }
-          >
-            Supprimer
-          </button>
-        </div>
-      ))}
-
-      {/* 6. Publicités */}
-      <h2 id="admin-ads">📢 Gestion des publicités</h2>
-
-      <p>
-        Activez ou désactivez chaque emplacement.
-        Collez le code fourni par Google AdSense seulement
-        quand votre compte sera validé.
-      </p>
-
-      {D.ads.map((a: any) => (
-        <div
-          className="card"
-          key={a.slot}
-          style={{ marginBottom: 10 }}
-        >
-          <label>
-            <input
-              type="checkbox"
-              checked={a.enabled}
-              onChange={(e) =>
-                run(
-                  supabase
-                    .from("ads")
-                    .update({
-                      enabled: e.target.checked,
-                    })
-                    .eq("slot", a.slot)
-                )
-              }
-            />
-
-            <b>{a.label}</b>
-          </label>
-
-          <textarea
-            style={{
-              width: "100%",
-              marginTop: 8,
-            }}
-            rows={3}
-            placeholder="Code AdSense (facultatif)"
-            defaultValue={a.code}
-            onBlur={(e) =>
-              run(
-                supabase
-                  .from("ads")
-                  .update({ code: e.target.value })
-                  .eq("slot", a.slot)
-              )
-            }
-          />
-        </div>
-      ))}
-
-      {editingResource && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(7,20,50,.65)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div className="card" style={{ width: "min(520px, 100%)", background: "white", padding: 20, borderRadius: 14, boxShadow: "0 15px 50px #0003" }}>
-            <h2 style={{ marginTop: 0 }}>✏️ Modifier la ressource</h2>
-            <label style={{ display: "block", marginBottom: 5 }}>Titre</label>
-            <input style={{ width: "100%", marginBottom: 12, boxSizing: "border-box" }} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
-            <label style={{ display: "block", marginBottom: 5 }}>Type</label>
-            <select style={{ width: "100%", marginBottom: 12 }} value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}>
-              {[...new Set([...TYPES, editForm.type].filter(Boolean))].map((t: any) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <label style={{ display: "block", marginBottom: 5 }}>Niveau</label>
-            <select style={{ width: "100%", marginBottom: 16 }} value={editForm.level_id} onChange={(e) => setEditForm({ ...editForm, level_id: e.target.value })}>
-              <option value="">Choisir un niveau</option>
-              {D.levels.map((l: any) => <option key={l.id} value={String(l.id)}>{l.cycle ? `${l.cycle} — ` : ""}{l.name}</option>)}
-            </select>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button className="alt" onClick={() => setEditingResource(null)}>Annuler</button>
-              <button onClick={saveResourceEdit}>Enregistrer les modifications</button>
-            </div>
-          </div>
-        </div>
-      )}
-      </div>
-    </main>
       <style jsx global>{`
-        .massar-admin-shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh;background:#f3f6fc;color:#172554;gap:0;font-family:Arial,Helvetica,sans-serif}
-        .massar-admin-sidebar{background:linear-gradient(165deg,#073780 0%,#061d4d 62%,#041538 100%);color:#fff;padding:22px 14px;position:sticky;top:0;height:100vh;box-sizing:border-box;overflow:auto;box-shadow:8px 0 28px #08285b12}
-        .massar-brand{display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;padding:12px 5px 28px;font-size:36px}
-        .massar-brand strong{font-size:20px;letter-spacing:.2px}.massar-brand strong span{color:#55df79}.massar-brand small{font-size:12px;color:#c9dcff;letter-spacing:1.3px;text-transform:uppercase}
-        .massar-admin-sidebar nav{display:flex;flex-direction:column;gap:7px}.massar-admin-sidebar nav a{color:#eaf1ff;text-decoration:none;padding:13px 14px;border-radius:11px;font-weight:700;display:block;border:1px solid transparent;transition:background .18s,transform .18s}.massar-admin-sidebar nav a:hover{background:#1c65c9;color:white;border-color:#4a8de7;transform:translateX(2px)}
-        .massar-admin-main{width:auto!important;max-width:none!important;margin:0!important;padding:30px 32px!important;box-sizing:border-box;min-width:0}
-        .massar-admin-main h1{font-size:clamp(25px,2.4vw,36px);margin:0 0 22px;color:#10245d;letter-spacing:-.7px}.massar-admin-main h1 span{color:#168b32}
-        .massar-admin-main h2{margin-top:30px;padding:15px 18px;background:#fff;border:1px solid #e0e8f6;border-radius:14px;color:#10245d;box-shadow:0 5px 18px #10245d0a;font-size:20px}
-        .massar-admin-main h3{color:#18366e;font-size:17px}
-        .massar-admin-main .card,.massar-admin-main .row,.massar-admin-main .form{background:#fff;border:1px solid #e0e8f6;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 5px 18px #10245d0a}
-        .massar-admin-main .row{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-        .massar-admin-main h2#admin-stats + div{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important}
-        .massar-admin-main h2#admin-stats + div > div{background:linear-gradient(145deg,#fff,#f5f9ff)!important;border:1px solid #dce7fa!important;border-radius:16px!important;padding:22px!important;text-align:left!important;box-shadow:0 8px 24px #163d7b0c!important;position:relative;overflow:hidden}
-        .massar-admin-main h2#admin-stats + div > div:after{content:"";position:absolute;right:-22px;bottom:-32px;width:95px;height:95px;border-radius:50%;background:#dceaff;opacity:.45}
-        .massar-admin-main h2#admin-stats + div > div > div:first-child{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:13px;background:#e8f1ff;font-size:25px!important;margin-bottom:12px}
-        .massar-admin-main h2#admin-stats + div > div > div:nth-child(2){font-size:32px!important;color:#0a3478;font-weight:900;line-height:1.2;margin-bottom:5px}
-        .massar-admin-main h2#admin-stats + div > div > div:nth-child(3){font-size:13px;color:#637594;font-weight:700}
-        .massar-admin-main button{border-radius:9px;font-weight:700;padding:9px 13px;cursor:pointer;transition:filter .15s,transform .15s}.massar-admin-main button:hover{filter:brightness(.96);transform:translateY(-1px)}
-        .massar-admin-main input,.massar-admin-main select,.massar-admin-main textarea{border:1px solid #c9d7f0;border-radius:9px;padding:10px;max-width:100%;box-sizing:border-box;background:#fff;color:#172554}
-        .massar-admin-main table{background:#fff;border-radius:10px;overflow:hidden}.massar-admin-main th{background:#edf4ff;color:#19386f}.massar-admin-main td,.massar-admin-main th{padding:10px!important}
-        .massar-admin-main .msg{padding:12px 15px;border-radius:10px;background:#eef6ff;border:1px solid #cfe1ff;color:#17417e}
-        @media(max-width:1000px){.massar-admin-main h2#admin-stats + div{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-        @media(max-width:850px){.massar-admin-shell{grid-template-columns:1fr}.massar-admin-sidebar{position:relative;height:auto;padding:14px}.massar-admin-sidebar nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.massar-admin-main{padding:14px!important}.massar-admin-main h2#admin-stats + div{grid-template-columns:1fr!important}}
+        *{box-sizing:border-box}
+        .massar-dashboard{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh;background:#f5f7fc;color:#101f50;font-family:Arial,Helvetica,sans-serif}
+        .massar-sidebar{background:linear-gradient(160deg,#073779,#04183e);color:#fff;padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto;display:flex;flex-direction:column}
+        .brand{display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 4px 24px;gap:8px}.brand-mark{width:82px;height:82px;border-radius:50%;background:#fff;color:#0b4c9e;display:grid;place-items:center;font-size:38px;position:relative}.brand-mark span{position:absolute;right:6px;top:2px;color:#22bd4b;font-size:18px}.brand strong{font-size:20px}.brand strong b{color:#31ce54}.brand small{font-size:12px;color:#d5e3ff}
+        .massar-sidebar nav{display:flex;flex-direction:column;gap:6px}.massar-sidebar nav>a,.massar-sidebar summary{display:flex;align-items:center;gap:13px;padding:12px 13px;border-radius:10px;color:#edf4ff;text-decoration:none;font-weight:700;cursor:pointer;list-style:none}.massar-sidebar nav>a:hover,.massar-sidebar summary:hover,.massar-sidebar .nav-active{background:#1478f5;color:white}.nav-sub{display:flex;flex-direction:column;padding-left:45px}.nav-sub a{padding:8px;color:#e5efff;text-decoration:none;border-radius:7px}.nav-sub a:hover{background:#1669ca}.sidebar-bottom{margin-top:auto;text-align:center;padding:18px 4px 8px;font-size:12px;color:#dce8ff}
+        .dashboard-main{min-width:0;padding:20px 22px 30px}.dashboard-header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:2px 0 18px;border-bottom:1px solid #e1e8f5;margin-bottom:16px}.dashboard-header h1{font-size:clamp(22px,2vw,32px);margin:0 0 5px;letter-spacing:-.6px}.dashboard-header h1 span{color:#168a2e}.dashboard-header p{margin:0;color:#455b88;font-size:14px}.header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.date-chip,.admin-chip{background:white;border:1px solid #d7e2f4;border-radius:12px;padding:11px 13px;box-shadow:0 3px 12px #10245d08;white-space:nowrap;font-size:13px}.admin-chip{display:flex;align-items:center;gap:9px}.admin-chip b{background:#4c80f5;color:white;border-radius:50%;padding:8px}.admin-chip i{background:#ef233c;width:8px;height:8px;border-radius:50%}.logout{background:#eaf1ff;border:1px solid #cbdcf8;color:#17478c;border-radius:9px;padding:9px 11px;cursor:pointer}
+        .stat-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}.stat-card{display:flex;align-items:center;gap:14px;border:1px solid;border-radius:16px;padding:16px;background:white;box-shadow:0 4px 12px #10245d0a;min-width:0}.stat-icon{width:60px;height:60px;display:grid;place-items:center;border-radius:15px;color:white;font-size:29px;font-weight:bold;flex-shrink:0}.stat-card label{display:block;font-size:14px;font-weight:700;margin-bottom:4px}.stat-card strong{font-size:clamp(22px,2vw,30px);font-weight:900;display:block;line-height:1.2}.stat-card small{display:block;font-size:11px;margin-top:5px;color:#65779a}.stat-card.blue{background:#eef6ff;border-color:#bfdbff}.blue .stat-icon{background:linear-gradient(135deg,#2991ff,#0062df)}.stat-card.green{background:#effdf2;border-color:#c6f2d0}.green .stat-icon{background:linear-gradient(135deg,#17c65b,#008e3b)}.stat-card.purple{background:#f4efff;border-color:#e1d2ff}.purple .stat-icon{background:linear-gradient(135deg,#a34cff,#6d20e8)}.stat-card.orange{background:#fff5e9;border-color:#ffdfb5}.orange .stat-icon{background:linear-gradient(135deg,#ffb000,#ff7900)}
+        .dashboard-grid{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(285px,.9fr);gap:14px;align-items:start}.left-column,.right-column{display:flex;flex-direction:column;gap:14px}.panel{background:#fff;border:1px solid #dce5f4;border-radius:15px;padding:15px;box-shadow:0 4px 14px #10245d08;min-width:0}.panel h2{font-size:19px;margin:0 0 14px;color:#10245d}.panel h3{margin:0 0 10px;font-size:15px}.level-groups{display:grid;grid-template-columns:1.7fr .85fr 1fr;gap:10px}.level-group{border-radius:12px;padding:12px;background:#edf5ff}.level-group.colège,.level-group.collège{background:#f2edff}.level-group.lycée{background:#eafbea}.level-group h3{margin:0 0 10px;color:#123a92}.level-group.collège h3{color:#4922a8}.level-group.lycée h3{color:#15702a}.level-buttons{display:flex;flex-wrap:wrap;gap:5px}.level-buttons button,.subject-buttons button{border:1px solid #cfdbef;background:white;border-radius:8px;padding:8px 10px;color:#10245d;font-weight:700;cursor:pointer}.level-buttons button.selected,.subject-buttons button.selected,.resource-tabs button.selected{background:#0875f5;color:#fff;border-color:#0875f5;box-shadow:0 3px 8px #0875f530}
+        .subject-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:15px}.subject-buttons button{display:flex;align-items:center;gap:8px;padding:10px 12px}.subject-buttons button span{font-size:18px}.resource-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.resource-tabs button{border:1px solid #d1def1;border-radius:9px;padding:9px 13px;background:#fff;font-weight:700;color:#172d65;cursor:pointer}.resource-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.resource-toolbar input{flex:1;min-width:150px}.resource-toolbar select{min-width:120px}.primary{background:#086df0!important;color:#fff!important;border:1px solid #086df0!important}.danger{background:#fff0f1!important;color:#e31c3d!important;border:1px solid #ffd1d7!important}.massar-dashboard input:not([type=checkbox]):not([type=file]),.massar-dashboard select,.massar-dashboard textarea{border:1px solid #cbd8ed;border-radius:9px;padding:10px;background:#fff;color:#172554;max-width:100%}.add-resource-form,.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;background:#f7faff;border:1px solid #e1eaf8;border-radius:12px;padding:12px;margin-bottom:14px}.add-resource-form .check-label{display:flex;align-items:center;gap:7px}.add-resource-form button{grid-column:1/-1}.table-wrap{overflow:auto}.resource-table, .panel table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}.resource-table th,.panel table th{background:#edf3fc;color:#172d65;text-align:left;padding:10px 8px}.resource-table td,.panel table td{padding:9px 8px;border-top:1px solid #e7edf7}.resource-table tbody tr:hover{background:#f8fbff}.pdf-icon{display:inline-block;background:#f04444;color:#fff;font-size:8px;font-weight:900;border-radius:4px;padding:5px 4px;margin-right:7px}.type-pill{display:inline-block;border-radius:14px;padding:5px 9px;background:#e4f8e8;color:#14722a;font-weight:700}.type-pill.cours{background:#dff2ff;color:#1261ac}.type-pill.resume,.type-pill.résumé{background:#eee3ff;color:#6722bc}.type-pill.controle,.type-pill.contrôle{background:#fff1c8;color:#9b5800}.download-count{color:#159638;font-weight:700}.actions{display:flex;gap:4px}.actions button{border:0;border-radius:6px;padding:5px 7px;background:#eaf2ff;cursor:pointer}.actions button:last-child{background:#ffe8eb}.empty{text-align:center;color:#7888a5;padding:25px!important}.table-footer{display:flex;justify-content:space-between;gap:10px;align-items:center;padding-top:12px;color:#687b9c;font-size:12px}.table-footer div{display:flex;gap:4px}.table-footer button{border:1px solid #d5e0f2;background:white;border-radius:7px;padding:7px 10px;cursor:pointer}.table-footer button.current{background:#0875f5;color:white;border-color:#0875f5}.table-footer button:disabled{opacity:.4}.simple-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #e8edf6;font-size:13px}.chart-panel svg{width:100%;display:block}.chart-panel svg text{font-size:10px;fill:#617392}.chart-legend{display:flex;justify-content:space-between;color:#7383a0;font-size:12px;margin-bottom:4px}.chart-legend b{color:#1477f5}.rank-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #edf1f8;font-size:12px}.rank{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#e9eff9;color:#1c376d;font-weight:800}.rank-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rank-row b,.green-arrow{color:#149632}.donut-layout{display:flex;align-items:center;gap:15px;flex-wrap:wrap}.donut{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}.donut>div{width:92px;height:92px;border-radius:50%;background:white;display:flex;flex-direction:column;align-items:center;justify-content:center}.donut strong{font-size:24px}.donut span{font-size:12px;font-weight:700}.type-legend{display:flex;flex-direction:column;gap:9px;flex:1;min-width:120px;font-size:12px}.type-legend div{display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;gap:7px}.type-legend i{width:9px;height:9px;border-radius:50%}.type-legend b{font-weight:600}.muted{color:#71819f;font-size:13px}.ad-card{padding:12px;border:1px solid #e4ebf7;border-radius:10px;margin:9px 0}.ad-card label{display:flex;align-items:center;gap:8px}.ad-card textarea{display:block;width:100%;margin-top:10px}.search-wide{width:100%;margin:8px 0 12px}.visitor-panel{margin-top:15px}.visitor-panel table{white-space:normal}.history{background:#f6f9ff;padding:12px;border-radius:10px;margin-top:12px}.modal-backdrop{position:fixed;inset:0;z-index:9999;background:#071432aa;display:flex;align-items:center;justify-content:center;padding:16px}.modal-card{width:min(500px,100%);background:white;padding:22px;border-radius:16px;box-shadow:0 20px 60px #0003;display:flex;flex-direction:column;gap:10px}.modal-card h2{margin:0 0 5px}.modal-card label{font-size:13px;font-weight:700}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.modal-actions button{padding:10px 14px;border:1px solid #d4dfef;background:#fff;border-radius:8px;cursor:pointer}
+        .admin-login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(145deg,#eff5ff,#f8fbff);padding:20px;color:#10245d;font-family:Arial}.login-card{width:min(420px,100%);background:#fff;border:1px solid #dce7f7;border-radius:18px;padding:28px;box-shadow:0 18px 55px #0b2d6814;display:flex;flex-direction:column;gap:12px}.login-logo{font-size:40px;text-align:center}.login-card h1{text-align:center;margin:0}.login-card h1 span{color:#159b38}.login-card p{text-align:center;margin:0 0 8px}.login-card input{padding:12px;border:1px solid #cbd8ed;border-radius:9px}.login-card button{background:#0875f5;color:white;border:0;border-radius:9px;padding:12px;font-weight:700;cursor:pointer}.msg{padding:10px 13px;background:#eef5ff;border:1px solid #cbdfff;border-radius:9px;color:#17417e}
+        @media(max-width:1250px){.stat-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-grid{grid-template-columns:minmax(0,1fr)}.right-column{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-header{align-items:flex-start;flex-direction:column}}
+        @media(max-width:850px){.massar-dashboard{grid-template-columns:1fr}.massar-sidebar{position:relative;height:auto}.massar-sidebar nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.sidebar-bottom{display:none}.dashboard-main{padding:12px}.stat-cards{grid-template-columns:1fr 1fr}.level-groups{grid-template-columns:1fr}.right-column{grid-template-columns:1fr}.header-actions{width:100%}}
+        @media(max-width:520px){.stat-cards{grid-template-columns:1fr}.dashboard-header h1{font-size:22px}.add-resource-form,.form-grid{grid-template-columns:1fr}.table-footer{align-items:flex-start;flex-direction:column}.subject-buttons button{flex:1}.date-chip{white-space:normal}}
       `}</style>
     </>
   );
