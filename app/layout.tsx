@@ -240,15 +240,17 @@ export default function Root({
             </div>
           </footer>
 
-          {/* WHATSAPP */}
-          <a
-            className="wa"
-            href={`https://wa.me/${process.env.NEXT_PUBLIC_WHATSAPP}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            💬 WhatsApp
-          </a>
+       
+{/* WHATSAPP */}
+<a
+  className="wa"
+  href="https://wa.me/212699516777"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  💬 WhatsApp
+</a>
+
         </div>
       </body>
     </html>
