@@ -1,6 +1,7 @@
 
 import "./globals.css";
 import VisitTracker from "./components/VisitTracker";
+import Script from "next/script";
 
 export const metadata = {
   title: "Association Massar - Espace éducatif",
@@ -18,6 +19,11 @@ export default function Root({
 }) {
   return (
     <html lang="fr">
+      <Script
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7789227220295594"
+        strategy="beforeInteractive"
+        crossOrigin="anonymous"
+      />
       <body>
         <div className="page">
           {/* TRACKING DES VISITES */}
