@@ -39,6 +39,8 @@ export default function Admin() {
   const [visitorSearch, setVisitorSearch] = useState("");
   const [data, setData] = useState<any>({ levels: [], subjects: [], level_subjects: [], chapters: [], resources: [], ads: [], visits: [], downloads: [] });
   const [form, setForm] = useState<any>({ type: TYPES?.[0] || "Exercice" });
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [editForm, setEditForm] = useState<any>({ title: "", type: TYPES?.[0] || "Exercice", level_id: "" });
   const [newLevel, setNewLevel] = useState({ name: "", cycle: "Primaire" });
   const [newSubject, setNewSubject] = useState({ name: "", icon: "📘", levels: [] as any[] });
   const [newChapter, setNewChapter] = useState("");
@@ -97,14 +99,27 @@ export default function Admin() {
     await run(supabase.from("resources").insert({ level_id: +form.level_id, subject_id: +form.subject_id, chapter_id: form.chapter_id ? +form.chapter_id : null, type: form.type, title: form.title.trim(), description: form.description || null, is_premium: !!form.is_premium, file_url }), "Ressource publiée ✅");
     setForm({ type: TYPES?.[0] || "Exercice" });
   }
-  async function editResource(r: any) {
-    const title = prompt("Modifier le titre", r.title || "");
-    if (title === null || !title.trim()) return;
-    const description = prompt("Modifier le résumé / description", r.description || "");
-    if (description === null) return;
-    const type = prompt("Type (Cours, Exercice, Résumé, Contrôle)", r.type || "Cours");
-    if (type === null || !type.trim()) return;
-    await run(supabase.from("resources").update({ title: title.trim(), description: description.trim() || null, type: type.trim() }).eq("id", r.id), "Ressource modifiée ✅");
+  function editResource(r: any) {
+    setEditingResource(r);
+    setEditForm({ title: r.title || "", type: r.type || (TYPES?.[0] || "Exercice"), level_id: String(r.level_id ?? "") });
+  }
+  async function saveResourceEdit() {
+    if (!editingResource) return;
+    if (!editForm.title?.trim() || !editForm.level_id || !editForm.type?.trim()) {
+      setMessage("Veuillez remplir le titre, le type et le niveau.");
+      return;
+    }
+    const levelChanged = String(editForm.level_id) !== String(editingResource.level_id);
+    const updateData: any = {
+      title: editForm.title.trim(),
+      type: editForm.type.trim(),
+      level_id: Number(editForm.level_id),
+    };
+    // A chapter is tied to a level; clear it if the resource is moved to another level.
+    if (levelChanged) updateData.chapter_id = null;
+    const resourceId = editingResource.id;
+    setEditingResource(null);
+    await run(supabase.from("resources").update(updateData).eq("id", resourceId), "Ressource modifiée ✅");
   }
   const askDelete = (name: string, query: any) => { if (confirm(`Supprimer définitivement « ${name} » ?`)) run(query, "Supprimé ✅"); };
   const filterDate = (value: string) => {
@@ -205,6 +220,23 @@ export default function Admin() {
         {section === "ads" && <div style={css.panel}><h2>📢 Gestion des publicités</h2><p>Activez les emplacements et modifiez leur code.</p>{data.ads.map((a:any)=><div key={a.slot} style={{...css.panel,marginBottom:10}}><label><input type="checkbox" checked={!!a.enabled} onChange={e=>run(supabase.from("ads").update({enabled:e.target.checked}).eq("slot",a.slot))}/> <b>{a.label}</b></label><textarea style={{...css.input,width:"100%",marginTop:8}} rows={3} defaultValue={a.code||""} placeholder="Code AdSense facultatif" onBlur={e=>run(supabase.from("ads").update({code:e.target.value}).eq("slot",a.slot))}/></div>)}</div>}
 
         {(section === "users" || section === "settings") && <div style={css.panel}><h2>{section === "users" ? "♙ Utilisateurs" : "⚙ Paramètres"}</h2><p>Cette rubrique nécessite une table/structure dédiée dans Supabase pour activer les actions. La navigation et l’interface sont en place, mais aucune donnée fictive n’est affichée.</p></div>}
+
+        {editingResource && <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "#0b173b99", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ ...css.panel, width: "min(520px, 100%)", boxShadow: "0 18px 50px #0003" }}>
+            <h2 style={{ marginTop: 0 }}>✏️ Modifier la ressource</h2>
+            <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Titre</label>
+            <input style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }} value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} placeholder="Nom de la ressource" />
+            <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Type</label>
+            <select style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }} value={editForm.type} onChange={e => setEditForm({ ...editForm, type: e.target.value })}>
+              {[...new Set([...(TYPES || []), editForm.type].filter(Boolean))].map((t: any) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Niveau</label>
+            <select style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 18 }} value={editForm.level_id} onChange={e => setEditForm({ ...editForm, level_id: e.target.value })}>
+              <option value="">Choisir un niveau</option>{data.levels.map((l: any) => <option key={l.id} value={String(l.id)}>{l.cycle ? `${l.cycle} — ` : ""}{l.name}</option>)}
+            </select>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><button style={css.btn} onClick={() => setEditingResource(null)}>Annuler</button><button style={css.primary} onClick={saveResourceEdit}>Enregistrer les modifications</button></div>
+          </div>
+        </div>}
       </section>
     </div>
   </main>;
