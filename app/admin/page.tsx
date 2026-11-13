@@ -73,6 +73,7 @@ export default function Admin() {
   const [newLevel, setNewLevel] = useState({ name: "", cycle: "Primaire" });
   const [newSubject, setNewSubject] = useState({ name: "", icon: "📘", levels: [] as any[] });
   const [newChapter, setNewChapter] = useState("");
+  const [draggedChapterId, setDraggedChapterId] = useState<string | number | null>(null);
   const [dateRangeLabel, setDateRangeLabel] = useState("Période personnalisée");
 
   async function load() {
@@ -80,7 +81,7 @@ export default function Admin() {
       supabase.from("levels").select("*").order("position"),
       supabase.from("subjects").select("*").order("name"),
       supabase.from("level_subjects").select("level_id,subject_id"),
-      supabase.from("chapters").select("*").order("title"),
+      supabase.from("chapters").select("*").order("position", { ascending: true }).order("title", { ascending: true }),
       supabase.from("resources").select("*").order("created_at", { ascending: false }),
       supabase.from("ads").select("*").order("slot"),
       supabase.from("site_visits").select("visitor_id,page_path,visited_at").order("visited_at", { ascending: false }),
@@ -336,6 +337,48 @@ export default function Admin() {
   const chaptersForForm = data.chapters.filter(
     (c: any) => c.level_id == form.level_id && c.subject_id == form.subject_id
   );
+
+  const chaptersForManagement = chaptersForForm
+    .slice()
+    .sort((a: any, b: any) =>
+      (Number(a.position ?? 999999) - Number(b.position ?? 999999)) ||
+      String(a.title || "").localeCompare(String(b.title || ""), "fr")
+    );
+
+  async function reorderChapters(fromId: string | number, toId: string | number) {
+    if (String(fromId) === String(toId)) return;
+
+    const reordered = chaptersForManagement.slice();
+    const fromIndex = reordered.findIndex((c: any) => String(c.id) === String(fromId));
+    const toIndex = reordered.findIndex((c: any) => String(c.id) === String(toId));
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    setData((previous: any) => ({
+      ...previous,
+      chapters: previous.chapters.map((chapter: any) => {
+        const index = reordered.findIndex((c: any) => String(c.id) === String(chapter.id));
+        return index >= 0 ? { ...chapter, position: index + 1 } : chapter;
+      })
+    }));
+    setMessage("Enregistrement du nouvel ordre…");
+
+    const results = await Promise.all(
+      reordered.map((chapter: any, index: number) =>
+        supabase.from("chapters").update({ position: index + 1 }).eq("id", chapter.id)
+      )
+    );
+    const errors = results.filter((result: any) => result.error);
+    if (errors.length) {
+      setMessage("Erreur lors de l’enregistrement de l’ordre : " + errors.map((result: any) => result.error.message).join(" / "));
+      await load();
+      return;
+    }
+    setMessage("Ordre des chapitres enregistré ✅");
+    await load();
+  }
 
   const select = (value: any, onChange: any, list: any[], placeholder: string) => (
     <select style={css.input} value={value || ""} onChange={e => onChange(e.target.value)}>
@@ -1160,6 +1203,10 @@ export default function Admin() {
         {section === "chapters" && (
           <div style={css.panel}>
             <h2>📖 Gestion des chapitres</h2>
+            <p style={{ color: "#475569" }}>
+              Choisissez un niveau et une matière, puis faites glisser les chapitres pour les classer comme vous le souhaitez.
+              L’ordre est enregistré dans Supabase.
+            </p>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
               {select(form.level_id, (v: any) => setForm({ ...form, level_id: v }), data.levels, "Niveau")}
@@ -1167,15 +1214,20 @@ export default function Admin() {
 
               <input style={css.input} placeholder="Titre du chapitre" value={newChapter} onChange={e => setNewChapter(e.target.value)} />
 
-              <button style={css.primary} onClick={() => {
+              <button style={css.primary} onClick={async () => {
                 if (!newChapter.trim() || !form.level_id || !form.subject_id) {
                   return setMessage("Niveau, matière et titre nécessaires");
                 }
 
-                run(supabase.from("chapters").insert({
+                const nextPosition = chaptersForManagement.length
+                  ? Math.max(...chaptersForManagement.map((c: any) => Number(c.position || 0))) + 1
+                  : 1;
+
+                await run(supabase.from("chapters").insert({
                   level_id: +form.level_id,
                   subject_id: +form.subject_id,
-                  title: newChapter
+                  title: newChapter.trim(),
+                  position: nextPosition
                 }), "Chapitre ajouté");
 
                 setNewChapter("");
@@ -1184,22 +1236,64 @@ export default function Admin() {
               </button>
             </div>
 
-            {data.chapters.map((c: any) => (
-              <div key={c.id} style={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: 10,
-                borderBottom: "1px solid #eee"
-              }}>
-                {c.title} — {nm(data.levels, c.level_id)} / {nm(data.subjects, c.subject_id)}
+            {!form.level_id || !form.subject_id ? (
+              <p style={{ ...css.panel, background: "#fff7ed", color: "#9a3412" }}>
+                Sélectionnez un niveau et une matière pour afficher et réorganiser leurs chapitres.
+              </p>
+            ) : chaptersForManagement.length === 0 ? (
+              <p>Aucun chapitre pour ce niveau et cette matière.</p>
+            ) : (
+              chaptersForManagement.map((c: any, index: number) => (
+                <div
+                  key={c.id}
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggedChapterId(c.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", String(c.id));
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const fromId = draggedChapterId ?? e.dataTransfer.getData("text/plain");
+                    if (fromId !== null && String(fromId) !== "") {
+                      reorderChapters(fromId, c.id);
+                    }
+                    setDraggedChapterId(null);
+                  }}
+                  onDragEnd={() => setDraggedChapterId(null)}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: 10,
+                    borderBottom: "1px solid #eee",
+                    border: "1px solid #dce5f3",
+                    borderRadius: 9,
+                    marginBottom: 7,
+                    background: draggedChapterId !== null && String(draggedChapterId) === String(c.id) ? "#eaf3ff" : "#fff",
+                    cursor: "grab"
+                  }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span title="Glisser pour déplacer" style={{ fontSize: 18, color: "#64748b" }}>⠿</span>
+                    <b style={{ color: "#16803b" }}>{index + 1}.</b>
+                    <span>{c.title}</span>
+                    <small style={{ color: "#64748b" }}>{nm(data.levels, c.level_id)} / {nm(data.subjects, c.subject_id)}</small>
+                  </span>
 
-                <button style={css.btn} onClick={() =>
-                  askDelete(c.title, supabase.from("chapters").delete().eq("id", c.id))
-                }>
-                  Supprimer
-                </button>
-              </div>
-            ))}
+                  <button style={{ ...css.btn, color: "#dc2626" }} onClick={() =>
+                    askDelete(c.title, supabase.from("chapters").delete().eq("id", c.id))
+                  }>
+                    Supprimer
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         )}
 
