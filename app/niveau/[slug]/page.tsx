@@ -30,9 +30,17 @@ export default async function Level({
 
   const { data: res } = await supabase
     .from("resources")
-    .select("*, chapters(title)")
+    .select("*, chapters(id,title)")
     .eq("level_id", level.id)
     .order("created_at", { ascending: false });
+
+  // ترتيب الفصول حسب position المحفوظ من لوحة الإدارة
+  const { data: chapterRecords } = await supabase
+    .from("chapters")
+    .select("id,title,subject_id,position")
+    .eq("level_id", level.id)
+    .order("position", { ascending: true })
+    .order("title", { ascending: true });
 
   const { data: ads } = await supabase
     .from("ads")
@@ -83,14 +91,30 @@ export default async function Level({
             (r: any) => r.subject_id === s.id
           );
 
-          const chapters = Array.from(
+          const resourceChapterNames = Array.from(
             new Set(
               items.map(
                 (r: any) =>
                   r.chapters?.title || "Sans chapitre"
               )
             )
-          );
+          ) as string[];
+
+          const orderedChapterNames = (chapterRecords || [])
+            .filter((chapter: any) => chapter.subject_id === s.id)
+            .map((chapter: any) => chapter.title)
+            .filter((title: string) =>
+              resourceChapterNames.includes(title)
+            );
+
+          const chapters = [
+            ...orderedChapterNames,
+            ...resourceChapterNames.filter(
+              (title) =>
+                title === "Sans chapitre" ||
+                !orderedChapterNames.includes(title)
+            ),
+          ];
 
           return (
             <section
@@ -150,27 +174,43 @@ export default async function Level({
                 {chapters.map((chapter: any) => {
                   const chapterItems = items.filter(
                     (r: any) =>
-                      (r.chapters?.title ||
-                        "Sans chapitre") === chapter
+                      (r.chapters?.title || "Sans chapitre") === chapter
                   );
 
                   return (
-                    <div key={chapter}>
-                      {/* MASQUER SANS CHAPITRE */}
-                      {chapter !== "Sans chapitre" && (
-                        <h3
-                          style={{
-                            color: theme.color,
-                            fontSize: "16px",
-                            fontWeight: 800,
-                            margin: "13px 6px 10px",
-                          }}
-                        >
-                          📚 {chapter}
-                        </h3>
-                      )}
+                    <details
+                      key={chapter}
+                      style={{
+                        background: "#ffffff",
+                        border: `1px solid ${theme.color}35`,
+                        borderRadius: "13px",
+                        margin: "10px 0",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <summary
+                        style={{
+                          cursor: "pointer",
+                          listStyle: "none",
+                          color: theme.color,
+                          fontSize: "15px",
+                          fontWeight: 900,
+                          padding: "13px 12px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "8px",
+                          background: theme.light,
+                        }}
+                      >
+                        <span>📚 {chapter}</span>
+                        <span style={{ fontSize: "12px" }}>
+                          {chapterItems.length} ressource(s)　⌄
+                        </span>
+                      </summary>
+                      <div style={{ padding: "9px" }}>
+                        {chapterItems.map((r: any) => (
 
-                      {chapterItems.map((r: any) => (
                         <div
                           key={r.id}
                           style={{
@@ -337,8 +377,9 @@ export default async function Level({
                             )}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    </details>
                   );
                 })}
 
