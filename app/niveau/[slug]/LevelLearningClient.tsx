@@ -156,13 +156,34 @@ export default function LevelLearningClient({
     /cours|résumé|fiche/i.test(r.type || "")
   );
 
-  const exercises = chapterResources.filter((r) =>
-    /exercice|examen|contrôle/i.test(r.type || "")
-  );
+  // Exercices uniquement : exclure les ressources déjà corrigées
+  // (ex. type = "Exercice corrigé") pour éviter les doublons.
+  const exercises = chapterResources.filter((r) => {
+    const type = String(r.type || "");
+    const title = String(r.title || "");
+    const description = String(r.description || "");
 
-  const corrections = chapterResources.filter((r) =>
-    /corrig|correction/i.test(r.type || "")
-  );
+    const isExercise = /exercice|examen|contrôle/i.test(type);
+    const isCorrection =
+      /corrig|correction/i.test(type) ||
+      /corrig|correction/i.test(title) ||
+      /corrig|correction/i.test(description);
+
+    return isExercise && !isCorrection;
+  });
+
+  // Corrections uniquement
+  const corrections = chapterResources.filter((r) => {
+    const type = String(r.type || "");
+    const title = String(r.title || "");
+    const description = String(r.description || "");
+
+    return (
+      /corrig|correction/i.test(type) ||
+      /corrig|correction/i.test(title) ||
+      /corrig|correction/i.test(description)
+    );
+  });
 
   const pdfs = chapterResources.filter(
     (r) => /pdf/i.test(r.type || "") || r.file_url
