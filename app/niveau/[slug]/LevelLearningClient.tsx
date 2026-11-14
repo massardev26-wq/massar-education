@@ -1,85 +1,6 @@
-
-"use client";
-
-import { useMemo, useState } from "react";
-
-const BLUE = "#0645b8";
-const NAVY = "#08245f";
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    color: NAVY,
-    background: "#f7faff",
-    padding: "16px 1.2% 28px",
-    fontFamily: "Arial, sans-serif",
-  },
-  breadcrumb: {
-    color: BLUE,
-    fontWeight: 700,
-    fontSize: 14,
-    margin: "0 0 14px",
-    display: "flex",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  banner: {
-    borderRadius: 18,
-    padding: "24px 30px",
-    color: "white",
-    background: "linear-gradient(105deg,#0645b8,#087fe5 60%,#063a96)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 14,
-    boxShadow: "0 5px 15px #124a9b20",
-    marginBottom: 16,
-  },
-  mainGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(240px, 23%) minmax(0, 1fr)",
-    gap: 14,
-    alignItems: "stretch",
-  },
-  sidebar: {
-    border: "1px solid #b9cce8",
-    borderRadius: 17,
-    background: "white",
-    overflow: "hidden",
-    minHeight: 500,
-  },
-  sideHead: {
-    padding: "16px 20px",
-    background: "linear-gradient(90deg,#073b8d,#0756bd)",
-    color: "white",
-    fontWeight: 900,
-    fontSize: 22,
-  },
-  main: {
-    border: "1px solid #b9cce8",
-    borderRadius: 17,
-    padding: 12,
-    background: "white",
-    minWidth: 0,
-  },
-  tabRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-    gap: 8,
-    margin: "14px 0",
-  },
-  pane: {
-    border: "1px solid #b8cce9",
-    borderRadius: 16,
-    padding: 12,
-    minWidth: 0,
-    background: "#fff",
-  },
-};
-
 // استخراج رقم التمرين أو التصحيح من العنوان أو النوع
 function extractResourceNumber(title: string, type: string) {
   const text = `${type || ""} ${title || ""}`;
-
   const match = text.match(
     /(?:exercice|exercise|correction|corrig[eé])\s*(?:n[°ºo.]?\s*)?(\d+)/i
   );
@@ -87,73 +8,114 @@ function extractResourceNumber(title: string, type: string) {
   return match ? Number(match[1]) : null;
 }
 
-
 export default function LevelLearningClient({
   level,
-  subjects,
-  resources,
-}: {
-  level: any;
-  subjects: any[];
-  resources: any[];
-}) {
-  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  subjects = [],
+  resources = [],
+}: LevelLearningClientProps) {
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
   const filteredResources = useMemo(() => {
     if (!selectedSubject) return resources;
 
     return resources.filter(
-      (resource: any) => resource.subjectId === selectedSubject.id
+      (resource) => String(resource.subjectId) === String(selectedSubject.id)
     );
   }, [resources, selectedSubject]);
 
+  const levelName = level?.name || level?.title || "المستوى الدراسي";
+  const selectedSubjectName = selectedSubject
+    ? getSubjectLabel(selectedSubject)
+    : "جميع الموارد";
+
   return (
-    <div style={styles.page}>
+    <div style={styles.page} dir="rtl">
       <div style={styles.banner}>
-        <h1>{level?.name || level?.title || "المستوى الدراسي"}</h1>
+        <h1 style={styles.bannerTitle}>{levelName}</h1>
       </div>
 
       <div style={styles.mainGrid}>
         <aside style={styles.sidebar}>
           <div style={styles.sideHead}>المواد الدراسية</div>
 
-          {subjects.map((subject: any) => (
-            <button
-              key={subject.id}
-              onClick={() => setSelectedSubject(subject)}
-              style={{
-                display: "block",
-                width: "100%",
-                padding: 12,
-                border: "none",
-                background:
-                  selectedSubject?.id === subject.id
-                    ? "#e5efff"
-                    : "white",
-                color: NAVY,
-                cursor: "pointer",
-              }}
-            >
-              {subject.name || subject.title}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => setSelectedSubject(null)}
+            style={{
+              ...styles.subjectButton,
+              background: selectedSubject === null ? "#e5efff" : "#fff",
+              color: NAVY,
+            }}
+          >
+            جميع الموارد
+          </button>
+
+          {subjects.map((subject) => {
+            const isSelected = String(selectedSubject?.id) === String(subject.id);
+
+            return (
+              <button
+                type="button"
+                key={subject.id}
+                onClick={() => setSelectedSubject(subject)}
+                style={{
+                  ...styles.subjectButton,
+                  background: isSelected ? "#e5efff" : "#fff",
+                  color: NAVY,
+                }}
+              >
+                {getSubjectLabel(subject)}
+              </button>
+            );
+          })}
         </aside>
 
         <main style={styles.main}>
-          <h2>
-            {selectedSubject?.name ||
-              selectedSubject?.title ||
-              "جميع الموارد"}
-          </h2>
+          <h2 style={styles.mainTitle}>{selectedSubjectName}</h2>
 
-          {filteredResources.map((resource: any, index: number) => (
-            <div key={resource.id || index} style={styles.pane}>
-              <h3>{resource.title || resource.name}</h3>
-              <p>{resource.description}</p>
+          {filteredResources.length === 0 ? (
+            <div style={styles.empty}>
+              لا توجد موارد متاحة لهذه المادة حالياً.
             </div>
-          ))}
+          ) : (
+            <div style={styles.resourceGrid}>
+              {filteredResources.map((resource, index) => {
+                const title = getResourceLabel(resource);
+                const type = resource.type || "مورد تعليمي";
+                const number = extractResourceNumber(title, type);
+
+                return (
+                  <article
+                    key={resource.id ?? `${title}-${index}`}
+                    style={styles.pane}
+                  >
+                    <span style={styles.typeBadge}>
+                      {type}
+                      {number !== null ? ` • ${number}` : ""}
+                    </span>
+
+                    <h3 style={styles.resourceTitle}>{title}</h3>
+
+                    {resource.description ? (
+                      <p style={styles.description}>{resource.description}</p>
+                    ) : (
+                      <p style={styles.description}>لا يوجد وصف لهذا المورد.</p>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </main>
       </div>
+
+      <style jsx>{`
+        @media (max-width: 760px) {
+          div[style*="grid-template-columns"] {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
