@@ -1,4 +1,3 @@
-```tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -26,8 +25,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 18,
     padding: "24px 30px",
     color: "white",
-    background:
-      "linear-gradient(105deg,#0645b8,#087fe5 60%,#063a96)",
+    background: "linear-gradient(105deg,#0645b8,#087fe5 60%,#063a96)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -94,7 +92,6 @@ export default function LevelLearningClient({
 
   const [tab, setTab] = useState<"cours" | "exercices">("exercices");
 
-  // PDF sélectionné pour l'afficher dans la même page
   const [selectedPdf, setSelectedPdf] = useState<any>(null);
 
   const subject =
@@ -154,28 +151,18 @@ export default function LevelLearningClient({
     /corrig|correction/i.test(r.type || "")
   );
 
-  // Documents PDF disponibles dans le chapitre
   const pdfs = chapterResources.filter(
     (r) =>
       /pdf/i.test(r.type || "") ||
       (r.file_url && /\.pdf(?:$|[?#])/i.test(r.file_url))
   );
 
-  // Les autres ressources PDF ne sont pas affichées dans un onglet séparé.
-  // Elles apparaissent dans la section Documents du chapitre.
-
   function downloadUrl(r: any) {
-    return `/api/download?url=${encodeURIComponent(
-      r.file_url
-    )}&title=${encodeURIComponent(
+    return `/api/download?url=${encodeURIComponent(r.file_url)}&title=${encodeURIComponent(
       r.title || "document"
-    )}&resource_id=${encodeURIComponent(
-      String(r.id || "")
-    )}&level_id=${encodeURIComponent(
+    )}&resource_id=${encodeURIComponent(String(r.id || ""))}&level_id=${encodeURIComponent(
       String(r.level_id || "")
-    )}&subject_id=${encodeURIComponent(
-      String(r.subject_id || "")
-    )}`;
+    )}&subject_id=${encodeURIComponent(String(r.subject_id || ""))}`;
   }
 
   function resourceCard(r: any, accent = BLUE) {
@@ -262,9 +249,7 @@ export default function LevelLearningClient({
           >
             <button
               type="button"
-              onClick={() => {
-                setSelectedPdf(r);
-              }}
+              onClick={() => setSelectedPdf(r)}
               style={{
                 background: BLUE,
                 color: "white",
@@ -464,7 +449,6 @@ export default function LevelLearningClient({
             </span>
           </div>
 
-          {/* Titre du chapitre avec fond décoratif */}
           <div
             style={{
               background:
@@ -597,9 +581,136 @@ export default function LevelLearningClient({
                 );
               })}
 
-              {/* Corrections restantes si elles dépassent le nombre d'exercices */}
               {corrections.slice(exercises.length).map((correction, index) => (
                 <div
                   key={correction.id}
                   style={{
-                    border: "1px solid
+                    border: "1px solid #edc5dc",
+                    borderRadius: 13,
+                    padding: 10,
+                    background: "#fff8fc",
+                    marginBottom: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "#ffdcec",
+                      borderRadius: 9,
+                      padding: 8,
+                      color: "#d82e75",
+                      fontWeight: 900,
+                      marginBottom: 8,
+                    }}
+                  >
+                    ✅ Correction {exercises.length + index + 1}
+                  </div>
+
+                  {resourceCard(correction, "#d82e75")}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {pdfs.length > 0 && (
+            <div
+              style={{
+                ...styles.pane,
+                marginTop: 14,
+                background: "#fffafa",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 12px",
+                  background: "#ffe5e5",
+                  borderRadius: 10,
+                  padding: 12,
+                  fontSize: 20,
+                }}
+              >
+                📄 Documents du chapitre
+              </h3>
+
+              {pdfs.map((r) => resourceCard(r, "#c52222"))}
+            </div>
+          )}
+
+          {selectedPdf && (
+            <div
+              style={{
+                marginTop: 16,
+                border: "1px solid #b8cce9",
+                borderRadius: 16,
+                padding: 12,
+                background: "#fff",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  marginBottom: 12,
+                }}
+              >
+                <h3 style={{ margin: 0, color: NAVY }}>
+                  📄 {selectedPdf.title}
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedPdf(null)}
+                  style={{
+                    border: "none",
+                    borderRadius: 9,
+                    padding: "8px 12px",
+                    background: "#e8eff9",
+                    color: NAVY,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✖ Fermer
+                </button>
+              </div>
+
+              <iframe
+                key={selectedPdf.id}
+                src={selectedPdf.file_url}
+                title={selectedPdf.title || "Document PDF"}
+                style={{
+                  width: "100%",
+                  height: "min(75vh, 850px)",
+                  minHeight: 450,
+                  border: "1px solid #d8e5f5",
+                  borderRadius: 10,
+                  background: "#f5f8fc",
+                }}
+              />
+
+              <div style={{ marginTop: 10 }}>
+                <a
+                  href={downloadUrl(selectedPdf)}
+                  style={{
+                    display: "inline-block",
+                    background: "#20a43a",
+                    color: "white",
+                    borderRadius: 9,
+                    padding: "9px 13px",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    textDecoration: "none",
+                  }}
+                >
+                  ⬇ Télécharger le document
+                </a>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
