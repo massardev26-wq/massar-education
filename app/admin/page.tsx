@@ -208,6 +208,7 @@ export default function Admin() {
       title: r.title || "",
       type: r.type || (TYPES?.[0] || "Exercice"),
       level_id: String(r.level_id ?? ""),
+      chapter_id: r.chapter_id ? String(r.chapter_id) : "",
     });
   }
 
@@ -219,15 +220,12 @@ export default function Admin() {
       return;
     }
 
-    const levelChanged = String(editForm.level_id) !== String(editingResource.level_id);
-
     const updateData: any = {
       title: editForm.title.trim(),
       type: editForm.type.trim(),
       level_id: Number(editForm.level_id),
+      chapter_id: editForm.chapter_id ? Number(editForm.chapter_id) : null,
     };
-
-    if (levelChanged) updateData.chapter_id = null;
 
     const resourceId = editingResource.id;
     setEditingResource(null);
@@ -1370,7 +1368,7 @@ export default function Admin() {
               <select
                 style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 18 }}
                 value={editForm.level_id}
-                onChange={e => setEditForm({ ...editForm, level_id: e.target.value })}
+                onChange={e => setEditForm({ ...editForm, level_id: e.target.value, chapter_id: "" })}
               >
                 <option value="">Choisir un niveau</option>
                 {data.levels.map((l: any) => (
@@ -1378,6 +1376,27 @@ export default function Admin() {
                     {l.cycle ? `${l.cycle} — ` : ""}{l.name}
                   </option>
                 ))}
+              </select>
+
+              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Chapitre (facultatif)</label>
+              <select
+                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 18 }}
+                value={editForm.chapter_id || ""}
+                onChange={e => setEditForm({ ...editForm, chapter_id: e.target.value })}
+              >
+                <option value="">Aucun chapitre</option>
+                {data.chapters
+                  .filter((c: any) =>
+                    String(c.level_id) === String(editForm.level_id) &&
+                    String(c.subject_id) === String(editingResource.subject_id)
+                  )
+                  .sort((a: any, b: any) =>
+                    (Number(a.position ?? 999999) - Number(b.position ?? 999999)) ||
+                    String(a.title || "").localeCompare(String(b.title || ""), "fr")
+                  )
+                  .map((c: any) => (
+                    <option key={c.id} value={String(c.id)}>{c.title}</option>
+                  ))}
               </select>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
