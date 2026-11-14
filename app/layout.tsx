@@ -1,4 +1,4 @@
-
+```tsx
 import "./globals.css";
 import VisitTracker from "./components/VisitTracker";
 import Script from "next/script";
@@ -111,7 +111,7 @@ export default function Root({
                 </div>
               </a>
 
-              {/* MENU */}
+              {/* MENU: ACCUEIL + NIVEAUX UNIQUEMENT */}
               <nav
                 style={{
                   display: "flex",
@@ -125,9 +125,6 @@ export default function Root({
                 {[
                   { label: "⌂ Accueil", href: "/" },
                   { label: "Niveaux ⌄", href: "/#niveaux" },
-                  { label: "Cours", href: "/#niveaux" },
-                  { label: "Exercices", href: "/#niveaux" },
-                  { label: "Examens", href: "/#niveaux" },
                 ].map((item) => (
                   <a
                     key={item.label}
@@ -207,10 +204,12 @@ export default function Root({
                 avenir meilleur.
               </p>
 
+              {/* SOCIAL MEDIA */}
               <div
                 style={{
                   display: "flex",
                   gap: "20px",
+                  flexWrap: "wrap",
                 }}
               >
                 <a
@@ -240,19 +239,18 @@ export default function Root({
             </div>
           </footer>
 
-       
-{/* WHATSAPP */}
-<a
-  className="wa"
-  href="https://wa.me/212699516777"
-  target="_blank"
-  rel="noopener noreferrer"
->
-  💬 WhatsApp
-</a>
-
+          {/* WHATSAPP */}
+          <a
+            className="wa"
+            href="https://wa.me/212699516777"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            💬 WhatsApp
+          </a>
         </div>
       </body>
     </html>
   );
 }
+```
