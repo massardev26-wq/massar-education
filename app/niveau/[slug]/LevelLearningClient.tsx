@@ -87,6 +87,7 @@ function extractResourceNumber(title: string, type: string) {
   return match ? Number(match[1]) : null;
 }
 
+
 export default function LevelLearningClient({
   level,
   subjects,
@@ -94,3 +95,65 @@ export default function LevelLearningClient({
 }: {
   level: any;
   subjects: any[];
+  resources: any[];
+}) {
+  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+
+  const filteredResources = useMemo(() => {
+    if (!selectedSubject) return resources;
+
+    return resources.filter(
+      (resource: any) => resource.subjectId === selectedSubject.id
+    );
+  }, [resources, selectedSubject]);
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.banner}>
+        <h1>{level?.name || level?.title || "المستوى الدراسي"}</h1>
+      </div>
+
+      <div style={styles.mainGrid}>
+        <aside style={styles.sidebar}>
+          <div style={styles.sideHead}>المواد الدراسية</div>
+
+          {subjects.map((subject: any) => (
+            <button
+              key={subject.id}
+              onClick={() => setSelectedSubject(subject)}
+              style={{
+                display: "block",
+                width: "100%",
+                padding: 12,
+                border: "none",
+                background:
+                  selectedSubject?.id === subject.id
+                    ? "#e5efff"
+                    : "white",
+                color: NAVY,
+                cursor: "pointer",
+              }}
+            >
+              {subject.name || subject.title}
+            </button>
+          ))}
+        </aside>
+
+        <main style={styles.main}>
+          <h2>
+            {selectedSubject?.name ||
+              selectedSubject?.title ||
+              "جميع الموارد"}
+          </h2>
+
+          {filteredResources.map((resource: any, index: number) => (
+            <div key={resource.id || index} style={styles.pane}>
+              <h3>{resource.title || resource.name}</h3>
+              <p>{resource.description}</p>
+            </div>
+          ))}
+        </main>
+      </div>
+    </div>
+  );
+}
