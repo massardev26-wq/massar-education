@@ -1,52 +1,34 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { CSSProperties } from "react";
 
 const BLUE = "#0645b8";
 const NAVY = "#08245f";
 
-type Subject = {
-  id: string | number;
-  name?: string;
-  title?: string;
-};
-
-type Resource = {
-  id?: string | number;
-  subjectId?: string | number;
-  title?: string;
-  name?: string;
-  description?: string;
-  type?: string;
-};
-
-type LevelLearningClientProps = {
-  level: any;
-  subjects: Subject[];
-  resources: Resource[];
-};
-
-const styles: Record<string, CSSProperties> = {
+const styles: Record<string, React.CSSProperties> = {
   page: {
     color: NAVY,
     background: "#f7faff",
     padding: "16px 1.2% 28px",
     fontFamily: "Arial, sans-serif",
-    minHeight: "100vh",
-    boxSizing: "border-box",
   },
+
   breadcrumb: {
     color: BLUE,
     fontWeight: 700,
     fontSize: 14,
     margin: "0 0 14px",
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
   },
+
   banner: {
     borderRadius: 18,
     padding: "24px 30px",
     color: "white",
-    background: "linear-gradient(105deg,#0645b8,#087fe5 60%,#063a96)",
+    background:
+      "linear-gradient(105deg,#0645b8,#087fe5 60%,#063a96)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -54,222 +36,766 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: "0 5px 15px #124a9b20",
     marginBottom: 16,
   },
-  bannerTitle: {
-    margin: 0,
-    fontSize: "clamp(22px, 3vw, 32px)",
-    fontWeight: 900,
-  },
+
   mainGrid: {
     display: "grid",
-    gridTemplateColumns: "minmax(220px, 23%) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(240px, 23%) minmax(0, 1fr)",
     gap: 14,
     alignItems: "stretch",
   },
+
   sidebar: {
     border: "1px solid #b9cce8",
     borderRadius: 17,
     background: "white",
     overflow: "hidden",
-    minHeight: 300,
+    minHeight: 500,
   },
+
   sideHead: {
     padding: "16px 20px",
     background: "linear-gradient(90deg,#073b8d,#0756bd)",
     color: "white",
     fontWeight: 900,
-    fontSize: 20,
+    fontSize: 22,
   },
-  subjectButton: {
-    display: "block",
-    width: "100%",
-    padding: "13px 16px",
-    border: "none",
-    borderBottom: "1px solid #edf2fa",
-    textAlign: "right",
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: "pointer",
-    transition: "background 0.15s ease",
-  },
+
   main: {
     border: "1px solid #b9cce8",
     borderRadius: 17,
-    padding: 16,
+    padding: 12,
     background: "white",
     minWidth: 0,
   },
-  mainTitle: {
-    margin: "0 0 14px",
-    fontSize: 22,
-    fontWeight: 900,
-  },
-  resourceGrid: {
+
+  tabRow: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
-    gap: 12,
+    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
+    gap: 8,
+    margin: "14px 0",
   },
+
   pane: {
     border: "1px solid #b8cce9",
-    borderRadius: 15,
-    padding: 14,
+    borderRadius: 16,
+    padding: 12,
     minWidth: 0,
     background: "#fff",
-    boxShadow: "0 2px 8px #0b3e8110",
-  },
-  resourceTitle: {
-    margin: "0 0 8px",
-    fontSize: 17,
-    fontWeight: 800,
-    overflowWrap: "anywhere",
-  },
-  description: {
-    margin: 0,
-    color: "#435675",
-    lineHeight: 1.7,
-    whiteSpace: "pre-wrap",
-    overflowWrap: "anywhere",
-  },
-  typeBadge: {
-    display: "inline-block",
-    marginBottom: 9,
-    borderRadius: 999,
-    padding: "4px 10px",
-    background: "#e8f1ff",
-    color: BLUE,
-    fontSize: 12,
-    fontWeight: 800,
-  },
-  empty: {
-    border: "1px dashed #b8cce9",
-    borderRadius: 14,
-    padding: 24,
-    textAlign: "center",
-    color: "#60728f",
-    background: "#f8fbff",
-    lineHeight: 1.8,
   },
 };
 
-function getSubjectLabel(subject: Subject) {
-  return subject.name || subject.title || "مادة بدون اسم";
-}
-
-function getResourceLabel(resource: Resource) {
-  return resource.title || resource.name || "مورد بدون عنوان";
-}
-
-// استخراج رقم التمرين أو التصحيح من العنوان أو النوع
-function extractResourceNumber(title: string, type: string) {
-  const text = `${type || ""} ${title || ""}`;
-  const match = text.match(
-    /(?:exercice|exercise|correction|corrig[eé])\s*(?:n[°ºo.]?\s*)?(\d+)/i
-  );
-
-  return match ? Number(match[1]) : null;
-}
-
 export default function LevelLearningClient({
   level,
-  subjects = [],
-  resources = [],
-}: LevelLearningClientProps) {
-  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  subjects,
+  resources,
+}: {
+  level: any;
+  subjects: any[];
+  resources: any[];
+}) {
+  const [subjectId, setSubjectId] = useState(
+    String(subjects[0]?.id ?? "")
+  );
 
-  const filteredResources = useMemo(() => {
-    if (!selectedSubject) return resources;
+  const [chapterName, setChapterName] = useState("");
 
-    return resources.filter(
-      (resource) => String(resource.subjectId) === String(selectedSubject.id)
+  const [tab, setTab] = useState<"cours" | "exercices">(
+    "exercices"
+  );
+
+  const [viewingResource, setViewingResource] = useState<any>(null);
+
+  const subject =
+    subjects.find((s) => String(s.id) === subjectId) ||
+    subjects[0];
+
+  const subjectResources = resources.filter(
+    (r) => String(r.subject_id) === String(subject?.id)
+  );
+
+  const chapters = useMemo(() => {
+    const names = Array.from(
+      new Set(
+        subjectResources.map(
+          (r) => r.chapters?.title || "Sans chapitre"
+        )
+      )
     );
-  }, [resources, selectedSubject]);
 
-  const levelName = level?.name || level?.title || "المستوى الدراسي";
-  const selectedSubjectName = selectedSubject
-    ? getSubjectLabel(selectedSubject)
-    : "جميع الموارد";
+    return names.sort((a, b) => {
+      const pa = subjectResources.find(
+        (r) => (r.chapters?.title || "Sans chapitre") === a
+      )?.chapters?.position;
 
-  return (
-    <div style={styles.page} dir="rtl">
-      <div style={styles.banner}>
-        <h1 style={styles.bannerTitle}>{levelName}</h1>
-      </div>
+      const pb = subjectResources.find(
+        (r) => (r.chapters?.title || "Sans chapitre") === b
+      )?.chapters?.position;
 
-      <div style={styles.mainGrid}>
-        <aside style={styles.sidebar}>
-          <div style={styles.sideHead}>المواد الدراسية</div>
+      if (
+        typeof pa === "number" &&
+        typeof pb === "number" &&
+        pa !== pb
+      ) {
+        return pa - pb;
+      }
 
-          <button
-            type="button"
-            onClick={() => setSelectedSubject(null)}
+      return a.localeCompare(b, "fr");
+    });
+  }, [subjectResources]);
+
+  const activeChapter = chapters.includes(chapterName)
+    ? chapterName
+    : chapters[0] || "";
+
+  const chapterResources = subjectResources.filter(
+    (r) =>
+      (r.chapters?.title || "Sans chapitre") === activeChapter
+  );
+
+  const cours = chapterResources.filter((r) =>
+    /cours|résumé|fiche/i.test(r.type || "")
+  );
+
+  const exercises = chapterResources.filter((r) =>
+    /exercice|examen|contrôle/i.test(r.type || "")
+  );
+
+  const corrections = chapterResources.filter((r) =>
+    /corrig|correction/i.test(r.type || "")
+  );
+
+  const pdfs = chapterResources.filter(
+    (r) => /pdf/i.test(r.type || "") || r.file_url
+  );
+
+  // Extraction du numéro de l'exercice ou de la correction
+  function getExerciseNumber(resource: any): number | null {
+    const text = `${resource.title || ""} ${resource.description || ""}`;
+
+    const match = text.match(
+      /(?:exercice|exercices|correction|corrigé|corrige)\s*(?:n[°ºo]?\s*)?(\d+)/i
+    );
+
+    return match ? Number(match[1]) : null;
+  }
+
+  // Associer exercice et correction selon leur numéro
+  const pairedExercises = useMemo(() => {
+    const sortedExercises = [...exercises].sort((a, b) => {
+      const numA = getExerciseNumber(a);
+      const numB = getExerciseNumber(b);
+
+      if (numA !== null && numB !== null) {
+        return numA - numB;
+      }
+
+      return String(a.title || "").localeCompare(
+        String(b.title || ""),
+        "fr"
+      );
+    });
+
+    return sortedExercises.map((exercise, index) => {
+      const exerciseNumber = getExerciseNumber(exercise);
+
+      let correction = corrections.find((c) => {
+        const correctionNumber = getExerciseNumber(c);
+
+        return (
+          exerciseNumber !== null &&
+          correctionNumber === exerciseNumber
+        );
+      });
+
+      // Si les numéros ne sont pas disponibles,
+      // on associe les ressources selon leur ordre.
+      if (!correction && exerciseNumber === null) {
+        correction = corrections[index];
+      }
+
+      return {
+        exercise,
+        correction,
+        number: exerciseNumber ?? index + 1,
+      };
+    });
+  }, [exercises, corrections]);
+
+  function resourceCard(
+    r: any,
+    accent = BLUE,
+    showNumber = false
+  ) {
+    return (
+      <article
+        key={r.id}
+        style={{
+          border: "1px solid #d8e5f5",
+          borderRadius: 13,
+          background: "white",
+          padding: 12,
+          marginBottom: 10,
+          boxShadow: "0 3px 9px #102e650a",
+          overflowWrap: "anywhere",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            marginBottom: 8,
+          }}
+        >
+          <span
             style={{
-              ...styles.subjectButton,
-              background: selectedSubject === null ? "#e5efff" : "#fff",
-              color: NAVY,
+              background: "#e4efff",
+              color: accent,
+              borderRadius: 20,
+              padding: "4px 9px",
+              fontSize: 12,
+              fontWeight: 900,
             }}
           >
-            جميع الموارد
-          </button>
+            {r.type}
+          </span>
 
-          {subjects.map((subject) => {
-            const isSelected = String(selectedSubject?.id) === String(subject.id);
-
-            return (
-              <button
-                type="button"
-                key={subject.id}
-                onClick={() => setSelectedSubject(subject)}
-                style={{
-                  ...styles.subjectButton,
-                  background: isSelected ? "#e5efff" : "#fff",
-                  color: NAVY,
-                }}
-              >
-                {getSubjectLabel(subject)}
-              </button>
-            );
-          })}
-        </aside>
-
-        <main style={styles.main}>
-          <h2 style={styles.mainTitle}>{selectedSubjectName}</h2>
-
-          {filteredResources.length === 0 ? (
-            <div style={styles.empty}>
-              لا توجد موارد متاحة لهذه المادة حالياً.
-            </div>
-          ) : (
-            <div style={styles.resourceGrid}>
-              {filteredResources.map((resource, index) => {
-                const title = getResourceLabel(resource);
-                const type = resource.type || "مورد تعليمي";
-                const number = extractResourceNumber(title, type);
-
-                return (
-                  <article
-                    key={resource.id ?? `${title}-${index}`}
-                    style={styles.pane}
-                  >
-                    <span style={styles.typeBadge}>
-                      {type}
-                      {number !== null ? ` • ${number}` : ""}
-                    </span>
-
-                    <h3 style={styles.resourceTitle}>{title}</h3>
-
-                    {resource.description ? (
-                      <p style={styles.description}>{resource.description}</p>
-                    ) : (
-                      <p style={styles.description}>لا يوجد وصف لهذا المورد.</p>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
+          {r.is_premium && (
+            <span
+              style={{
+                background: "#fff0c2",
+                color: "#8b5a00",
+                borderRadius: 20,
+                padding: "4px 9px",
+                fontSize: 12,
+                fontWeight: 900,
+              }}
+            >
+              🔒 Premium
+            </span>
           )}
-        </main>
+        </div>
+
+        <b
+          style={{
+            fontSize: 15,
+            lineHeight: 1.4,
+          }}
+        >
+          {r.title}
+        </b>
+
+        {r.description && (
+          <p
+            style={{
+              margin: "6px 0 0",
+              color: "#526078",
+              fontSize: 13,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {r.description}
+          </p>
+        )}
+
+        {r.file_url && !r.is_premium && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 7,
+              marginTop: 10,
+            }}
+          >
+            <button
+              onClick={() => setViewingResource(r)}
+              style={{
+                background: BLUE,
+                color: "white",
+                borderRadius: 9,
+                padding: "8px 11px",
+                fontWeight: 800,
+                fontSize: 12,
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              👁 Consulter
+            </button>
+
+            <a
+              href={`/api/download?url=${encodeURIComponent(
+                r.file_url
+              )}&title=${encodeURIComponent(
+                r.title || "document"
+              )}&resource_id=${encodeURIComponent(
+                String(r.id || "")
+              )}&level_id=${encodeURIComponent(
+                String(r.level_id || "")
+              )}&subject_id=${encodeURIComponent(
+                String(r.subject_id || "")
+              )}`}
+              style={{
+                background: "#20a43a",
+                color: "white",
+                borderRadius: 9,
+                padding: "8px 11px",
+                fontWeight: 800,
+                fontSize: 12,
+                textDecoration: "none",
+                display: "inline-block",
+              }}
+            >
+              ⬇ Télécharger
+            </a>
+          </div>
+        )}
+      </article>
+    );
+  }
+
+  const tabButton = (
+    key: typeof tab,
+    label: string,
+    icon: string
+  ) => (
+    <button
+      onClick={() => {
+        setTab(key);
+        setViewingResource(null);
+      }}
+      style={{
+        border: "1px solid #9bb9e6",
+        borderRadius: 12,
+        padding: "13px 8px",
+        background:
+          tab === key
+            ? "linear-gradient(100deg,#0645b8,#084de0)"
+            : "#f8fbff",
+        color: tab === key ? "white" : NAVY,
+        fontWeight: 900,
+        fontSize: 16,
+        cursor: "pointer",
+      }}
+    >
+      {icon} {label}
+    </button>
+  );
+
+  return (
+    <main style={styles.page}>
+      {/* BREADCRUMB */}
+      <div style={styles.breadcrumb}>
+        ⌂ Accueil　›　{level.cycle || "Niveau"}　›　{level.name}
+       　›　{subject?.name || "Matière"}
       </div>
 
+      {/* HEADER */}
+      <header style={styles.banner}>
+        <div>
+          <div
+            style={{
+              fontSize: 13,
+              opacity: 0.9,
+              fontWeight: 700,
+            }}
+          >
+            ESPACE ÉDUCATIF • MASSAR
+          </div>
 
-    </div>
+          <h1
+            style={{
+              margin: "7px 0 0",
+              fontSize: "clamp(24px,3vw,36px)",
+              fontWeight: 900,
+            }}
+          >
+            {subject?.icon || "📚"}{" "}
+            {subject?.name || "Choisissez une matière"} – {level.name}
+          </h1>
+        </div>
+
+        <div style={{ fontSize: 54 }} aria-hidden>
+          📚 ✏️
+        </div>
+      </header>
+
+      {/* SUBJECTS */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          marginBottom: 14,
+        }}
+      >
+        {subjects.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => {
+              setSubjectId(String(s.id));
+              setChapterName("");
+              setViewingResource(null);
+            }}
+            style={{
+              border: "1px solid #b7cbe8",
+              borderRadius: 12,
+              padding: "10px 15px",
+              background:
+                String(s.id) === String(subject?.id)
+                  ? BLUE
+                  : "white",
+              color:
+                String(s.id) === String(subject?.id)
+                  ? "white"
+                  : NAVY,
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            {s.icon || "📘"} {s.name}
+          </button>
+        ))}
+      </div>
+
+      {/* MAIN GRID */}
+      <div style={styles.mainGrid}>
+        {/* SIDEBAR */}
+        <aside style={styles.sidebar}>
+          <div style={styles.sideHead}>📖 Chapitres</div>
+
+          {chapters.map((chapter, i) => (
+            <button
+              key={chapter}
+              onClick={() => {
+                setChapterName(chapter);
+                setViewingResource(null);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "calc(100% - 18px)",
+                margin: "9px",
+                padding: "13px 12px",
+                textAlign: "left",
+                borderRadius: 12,
+                border: "1px solid #d2e0f3",
+                background:
+                  chapter === activeChapter
+                    ? "linear-gradient(100deg,#0645b8,#0759c8)"
+                    : "white",
+                color:
+                  chapter === activeChapter ? "white" : NAVY,
+                fontWeight: 900,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              <span style={{ fontSize: 20 }}>📁</span>
+
+              <span style={{ flex: 1 }}>
+                Chapitre {i + 1} : {chapter}
+              </span>
+
+              <span>⌄</span>
+            </button>
+          ))}
+        </aside>
+
+        {/* CONTENT */}
+        <section style={styles.main}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <h2
+              style={{
+                margin: "4px 0",
+                fontSize: "clamp(20px,2.4vw,27px)",
+                fontWeight: 900,
+              }}
+            >
+              📂 {activeChapter || "Aucun chapitre"}
+            </h2>
+
+            <span
+              style={{
+                color: "#59708f",
+                fontWeight: 700,
+                fontSize: 13,
+              }}
+            >
+              {level.name} › {subject?.name}
+            </span>
+          </div>
+
+          {/* CHAPTER TITLE */}
+          <div
+            style={{
+              background:
+                "linear-gradient(90deg,#0645b8,#087fe5)",
+              color: "white",
+              borderRadius: 12,
+              padding: "18px 15px",
+              fontWeight: 900,
+              marginTop: 10,
+              fontSize: 20,
+              boxShadow: "0 4px 12px #0645b820",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            📖 Leçon : {activeChapter}
+          </div>
+
+          {/* TABS */}
+          <div style={styles.tabRow}>
+            {tabButton("cours", "Cours", "📖")}
+
+            {tabButton(
+              "exercices",
+              "Exercices + Correction",
+              "📝"
+            )}
+          </div>
+
+          {/* INLINE PDF VIEWER */}
+          {viewingResource && (
+            <div
+              style={{
+                border: "1px solid #b8cce9",
+                borderRadius: 15,
+                padding: 12,
+                background: "#f5faff",
+                marginBottom: 14,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  marginBottom: 10,
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 17,
+                    fontWeight: 900,
+                  }}
+                >
+                  📄 {viewingResource.title}
+                </h3>
+
+                <button
+                  onClick={() => setViewingResource(null)}
+                  style={{
+                    background: "#dc2626",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 9,
+                    padding: "8px 12px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✖ Fermer
+                </button>
+              </div>
+
+              <iframe
+                src={viewingResource.file_url}
+                title={viewingResource.title}
+                style={{
+                  width: "100%",
+                  height: "75vh",
+                  minHeight: 450,
+                  border: "1px solid #d2e0f3",
+                  borderRadius: 10,
+                  background: "white",
+                }}
+              />
+
+              <div style={{ marginTop: 10 }}>
+                <a
+                  href={viewingResource.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: BLUE,
+                    fontWeight: 800,
+                    fontSize: 13,
+                  }}
+                >
+                  Ouvrir le document dans un nouvel onglet ↗
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* COURS */}
+          {tab === "cours" && (
+            <div
+              style={{
+                ...styles.pane,
+                background: "#f5faff",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 12px",
+                  background: "#dceaff",
+                  borderRadius: 10,
+                  padding: 12,
+                  fontSize: 20,
+                }}
+              >
+                📘 Cours
+              </h3>
+
+              {cours.length ? (
+                cours.map((r) => resourceCard(r))
+              ) : (
+                <p>Aucun cours disponible pour ce chapitre.</p>
+              )}
+            </div>
+          )}
+
+          {/* EXERCICES + CORRECTIONS */}
+          {tab === "exercices" && (
+            <div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit,minmax(min(100%,300px),1fr))",
+                  gap: 12,
+                }}
+              >
+                {/* EXERCISES COLUMN */}
+                <div
+                  style={{
+                    ...styles.pane,
+                    background: "#f9fcff",
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: "0 0 12px",
+                      background:
+                        "linear-gradient(90deg,#dceaff,#c6ddff)",
+                      borderRadius: 10,
+                      padding: 12,
+                      fontSize: 20,
+                    }}
+                  >
+                    ✏️ Exercices
+                  </h3>
+
+                  {pairedExercises.length ? (
+                    pairedExercises.map((item) => (
+                      <div key={item.exercise.id}>
+                        <div
+                          style={{
+                            background: "#e5efff",
+                            borderRadius: 9,
+                            padding: "8px 10px",
+                            marginBottom: 8,
+                            color: BLUE,
+                            fontWeight: 900,
+                          }}
+                        >
+                          Exercice {item.number}
+                        </div>
+
+                        {resourceCard(
+                          item.exercise,
+                          "#0875e1"
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p>Aucun exercice disponible.</p>
+                  )}
+                </div>
+
+                {/* CORRECTIONS COLUMN */}
+                <div
+                  style={{
+                    ...styles.pane,
+                    background: "#fff8fc",
+                    borderColor: "#edc5dc",
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: "0 0 12px",
+                      background:
+                        "linear-gradient(90deg,#ffdcec,#ffcae5)",
+                      borderRadius: 10,
+                      padding: 12,
+                      fontSize: 20,
+                    }}
+                  >
+                    ⭕ Corrections
+                  </h3>
+
+                  {pairedExercises.length ? (
+                    pairedExercises.map((item) => (
+                      <div key={item.exercise.id}>
+                        <div
+                          style={{
+                            background: "#ffe5f1",
+                            borderRadius: 9,
+                            padding: "8px 10px",
+                            marginBottom: 8,
+                            color: "#d82e75",
+                            fontWeight: 900,
+                          }}
+                        >
+                          Correction {item.number}
+                        </div>
+
+                        {item.correction ? (
+                          resourceCard(
+                            item.correction,
+                            "#d82e75"
+                          )
+                        ) : (
+                          <div
+                            style={{
+                              border: "1px dashed #edc5dc",
+                              borderRadius: 12,
+                              padding: 14,
+                              marginBottom: 10,
+                              color: "#a44c78",
+                              fontSize: 13,
+                            }}
+                          >
+                            Correction non disponible pour
+                            cet exercice.
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p>Aucune correction disponible.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
   );
 }
