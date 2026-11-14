@@ -1,4 +1,4 @@
-```tsx
+import type { ReactNode } from "react";
 import "./globals.css";
 import VisitTracker from "./components/VisitTracker";
 import Script from "next/script";
@@ -7,30 +7,28 @@ export const metadata = {
   title: "Association Massar - Espace éducatif",
   description:
     "Cours, exercices, examens et corrections du CP à la 2ème Bac.",
-
   verification: {
     google: "iBCshDSwXR8fEeD5Yo2jjNqZeBED8jsg7KnLXvRpp34",
   },
-
   other: {
     "google-adsense-account": "ca-pub-7789227220295594",
   },
 };
 
-export default function Root({
+export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <html lang="fr">
-      <Script
-        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7789227220295594"
-        strategy="beforeInteractive"
-        crossOrigin="anonymous"
-      />
-
       <body>
+        <Script
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7789227220295594"
+          strategy="afterInteractive"
+          crossOrigin="anonymous"
+        />
+
         <div className="page">
           {/* TRACKING DES VISITES */}
           <VisitTracker />
@@ -94,9 +92,7 @@ export default function Root({
                     }}
                   >
                     Association{" "}
-                    <span style={{ color: "#269b27" }}>
-                      Massar
-                    </span>
+                    <span style={{ color: "#269b27" }}>Massar</span>
                   </div>
 
                   <div
@@ -111,7 +107,7 @@ export default function Root({
                 </div>
               </a>
 
-              {/* MENU: ACCUEIL + NIVEAUX UNIQUEMENT */}
+              {/* MENU PRINCIPAL */}
               <nav
                 style={{
                   display: "flex",
@@ -156,8 +152,7 @@ export default function Root({
                   fontWeight: 800,
                   textDecoration: "none",
                   whiteSpace: "nowrap",
-                  boxShadow:
-                    "0 4px 12px rgba(7,80,173,0.18)",
+                  boxShadow: "0 4px 12px rgba(7,80,173,0.18)",
                 }}
               >
                 👤 Se connecter
@@ -190,8 +185,7 @@ export default function Root({
                   marginBottom: "10px",
                 }}
               >
-                Association Massar pour l’Éducation et le
-                Développement
+                Association Massar pour l’Éducation et le Développement
               </div>
 
               <p
@@ -200,8 +194,7 @@ export default function Root({
                   margin: "8px 0 18px",
                 }}
               >
-                Ensemble pour une éducation de qualité et un
-                avenir meilleur.
+                Ensemble pour une éducation de qualité et un avenir meilleur.
               </p>
 
               {/* SOCIAL MEDIA */}
@@ -253,4 +246,3 @@ export default function Root({
     </html>
   );
 }
-```
