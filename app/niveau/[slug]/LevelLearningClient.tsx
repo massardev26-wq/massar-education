@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState } from "react";
@@ -74,6 +75,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
   },
 };
+
+// استخراج رقم التمرين أو التصحيح من العنوان أو النوع
+function extractResourceNumber(title: string, type: string) {
+  const text = `${type || ""} ${title || ""}`;
+
+  const match = text.match(
+    /(?:exercice|exercise|correction|corrig[eé])\s*(?:n[°ºo.]?\s*)?(\d+)/i
+  );
+
+  return match ? Number(match[1]) : null;
+}
 
 export default function LevelLearningClient({
   level,
@@ -313,6 +325,61 @@ export default function LevelLearningClient({
     </button>
   );
 
+  // Récupérer les corrections déjà associées à un exercice
+  const usedCorrectionIds = new Set<string>();
+
+  function findCorrection(exercise: any, index: number) {
+    const exerciseNumber = extractResourceNumber(
+      exercise.title,
+      exercise.type
+    );
+
+    if (exerciseNumber !== null) {
+      const matchingCorrection = corrections.find((correction) => {
+        const correctionNumber = extractResourceNumber(
+          correction.title,
+          correction.type
+        );
+
+        return (
+          correctionNumber === exerciseNumber &&
+          !usedCorrectionIds.has(String(correction.id))
+        );
+      });
+
+      if (matchingCorrection) {
+        usedCorrectionIds.add(String(matchingCorrection.id));
+        return matchingCorrection;
+      }
+    }
+
+    // Si aucun numéro correspondant, utiliser l'ordre des ressources
+    const fallbackCorrection = corrections.find(
+      (correction, correctionIndex) =>
+        correctionIndex === index &&
+        !usedCorrectionIds.has(String(correction.id))
+    );
+
+    if (fallbackCorrection) {
+      usedCorrectionIds.add(String(fallbackCorrection.id));
+      return fallbackCorrection;
+    }
+
+    return null;
+  }
+
+  const exercisePairs = exercises.map((exercise, index) => ({
+    exercise,
+    correction: findCorrection(exercise, index),
+    number:
+      extractResourceNumber(exercise.title, exercise.type) ??
+      index + 1,
+  }));
+
+  const remainingCorrections = corrections.filter(
+    (correction) => !usedCorrectionIds.has(String(correction.id))
+  );
+
   return (
     <main style={styles.page}>
       <div style={styles.breadcrumb}>
@@ -510,78 +577,74 @@ export default function LevelLearningClient({
                 <p>Aucun exercice ou correction disponible.</p>
               )}
 
-              {exercises.map((exercise, index) => {
-                const correction = corrections[index];
-
-                return (
+              {exercisePairs.map(({ exercise, correction, number }) => (
+                <div
+                  key={exercise.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit,minmax(230px,1fr))",
+                    gap: 10,
+                    marginBottom: 12,
+                  }}
+                >
                   <div
-                    key={exercise.id}
                     style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit,minmax(230px,1fr))",
-                      gap: 10,
-                      marginBottom: 12,
+                      border: "1px solid #b8cce9",
+                      borderRadius: 13,
+                      padding: 10,
+                      background: "#f4f9ff",
                     }}
                   >
                     <div
                       style={{
-                        border: "1px solid #b8cce9",
-                        borderRadius: 13,
-                        padding: 10,
-                        background: "#f4f9ff",
+                        background: "#dceaff",
+                        borderRadius: 9,
+                        padding: 8,
+                        color: BLUE,
+                        fontWeight: 900,
+                        marginBottom: 8,
                       }}
                     >
-                      <div
-                        style={{
-                          background: "#dceaff",
-                          borderRadius: 9,
-                          padding: 8,
-                          color: BLUE,
-                          fontWeight: 900,
-                          marginBottom: 8,
-                        }}
-                      >
-                        ✏️ Exercice {index + 1}
-                      </div>
-
-                      {resourceCard(exercise, "#0875e1")}
+                      ✏️ Exercice {number}
                     </div>
 
+                    {resourceCard(exercise, "#0875e1")}
+                  </div>
+
+                  <div
+                    style={{
+                      border: "1px solid #edc5dc",
+                      borderRadius: 13,
+                      padding: 10,
+                      background: "#fff8fc",
+                    }}
+                  >
                     <div
                       style={{
-                        border: "1px solid #edc5dc",
-                        borderRadius: 13,
-                        padding: 10,
-                        background: "#fff8fc",
+                        background: "#ffdcec",
+                        borderRadius: 9,
+                        padding: 8,
+                        color: "#d82e75",
+                        fontWeight: 900,
+                        marginBottom: 8,
                       }}
                     >
-                      <div
-                        style={{
-                          background: "#ffdcec",
-                          borderRadius: 9,
-                          padding: 8,
-                          color: "#d82e75",
-                          fontWeight: 900,
-                          marginBottom: 8,
-                        }}
-                      >
-                        ✅ Correction {index + 1}
-                      </div>
-
-                      {correction ? (
-                        resourceCard(correction, "#d82e75")
-                      ) : (
-                        <p style={{ fontSize: 13 }}>
-                          Correction non disponible pour cet exercice.
-                        </p>
-                      )}
+                      ✅ Correction {number}
                     </div>
-                  </div>
-                );
-              })}
 
-              {corrections.slice(exercises.length).map((correction, index) => (
+                    {correction ? (
+                      resourceCard(correction, "#d82e75")
+                    ) : (
+                      <p style={{ fontSize: 13 }}>
+                        Correction non disponible pour cet exercice.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {remainingCorrections.map((correction, index) => (
                 <div
                   key={correction.id}
                   style={{
@@ -602,7 +665,7 @@ export default function LevelLearningClient({
                       marginBottom: 8,
                     }}
                   >
-                    ✅ Correction {exercises.length + index + 1}
+                    ✅ Correction supplémentaire {index + 1}
                   </div>
 
                   {resourceCard(correction, "#d82e75")}
