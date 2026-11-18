@@ -43,3 +43,10 @@ Section 6 de l'admin : activez ou désactivez chaque emplacement. Collez le code
 - Les ressources « Premium » sont pour l'instant seulement cachées (pas de bouton de téléchargement). Le paiement et l'accès réservé aux abonnés se feront dans une prochaine étape.
 - La page /admin est visible de tous, mais sans votre compte on ne peut rien modifier : la sécurité est dans la base de données.
 - Les matières proposées sont une base : ajustez-les dans l'admin selon le programme.
+
+
+## Mise à jour du contenu et partage entre niveaux
+
+Après déploiement de cette version, exécutez une seule fois le script `supabase/migration-content-and-shared-levels.sql` dans Supabase > SQL Editor > Run. Il ajoute le champ de contenu texte et la table de liaison des ressources à plusieurs niveaux. Les ressources existantes sont conservées et associées à leur niveau actuel.
+
+Dans l'administration, lors de l'ajout d'une ressource, sélectionnez un ou plusieurs niveaux (Ctrl/Cmd + clic). Le contenu saisi dans le champ texte s'affiche directement sur la page visiteur; le fichier PDF reste disponible en téléchargement si vous en ajoutez un.
