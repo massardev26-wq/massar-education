@@ -12,7 +12,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "16px 1.2% 28px",
     fontFamily: "Arial, sans-serif",
   },
-
   breadcrumb: {
     color: BLUE,
     fontWeight: 700,
@@ -22,13 +21,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 10,
     flexWrap: "wrap",
   },
-
   banner: {
     borderRadius: 18,
     padding: "24px 30px",
     color: "white",
-    background:
-      "linear-gradient(105deg,#0645b8,#087fe5 60%,#063a96)",
+    background: "linear-gradient(105deg,#0645b8,#087fe5 60%,#063a96)",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -36,22 +33,19 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 5px 15px #124a9b20",
     marginBottom: 16,
   },
-
   mainGrid: {
     display: "grid",
     gridTemplateColumns: "minmax(240px, 23%) minmax(0, 1fr)",
     gap: 14,
     alignItems: "stretch",
   },
-
   sidebar: {
     border: "1px solid #b9cce8",
     borderRadius: 17,
     background: "white",
     overflow: "hidden",
-    minHeight: 500,
+    minHeight: 300,
   },
-
   sideHead: {
     padding: "16px 20px",
     background: "linear-gradient(90deg,#073b8d,#0756bd)",
@@ -59,7 +53,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     fontSize: 22,
   },
-
   main: {
     border: "1px solid #b9cce8",
     borderRadius: 17,
@@ -67,189 +60,101 @@ const styles: Record<string, React.CSSProperties> = {
     background: "white",
     minWidth: 0,
   },
-
-  tabRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2,minmax(0,1fr))",
-    gap: 8,
-    margin: "14px 0",
-  },
-
-  pane: {
+  section: {
     border: "1px solid #b8cce9",
-    borderRadius: 16,
-    padding: 12,
-    minWidth: 0,
+    borderRadius: 14,
+    padding: 13,
     background: "#fff",
+    marginTop: 14,
+    minWidth: 0,
   },
 };
 
 export default function LevelLearningClient({
   level,
   subjects,
+  chapters,
   resources,
 }: {
   level: any;
   subjects: any[];
+  chapters: any[];
   resources: any[];
 }) {
-  const [subjectId, setSubjectId] = useState(
-    String(subjects[0]?.id ?? "")
-  );
-
-  const [chapterName, setChapterName] = useState("");
-
-  const [tab, setTab] = useState<"cours" | "exercices">(
-    "exercices"
-  );
-
+  const [subjectId, setSubjectId] = useState(String(subjects[0]?.id ?? ""));
+  const [selectedChapterId, setSelectedChapterId] = useState("");
   const [viewingResource, setViewingResource] = useState<any>(null);
 
   const subject =
-    subjects.find((s) => String(s.id) === subjectId) ||
-    subjects[0];
+    subjects.find((item) => String(item.id) === subjectId) || subjects[0];
 
-  const subjectResources = resources.filter(
-    (r) => String(r.subject_id) === String(subject?.id)
+  const subjectResources = useMemo(
+    () => resources.filter((resource) => String(resource.subject_id) === String(subject?.id)),
+    [resources, subject?.id]
   );
 
-  const chapters = useMemo(() => {
-    const names = Array.from(
-      new Set(
-        subjectResources.map(
-          (r) => r.chapters?.title || "Sans chapitre"
-        )
-      )
-    );
-
-    return names.sort((a, b) => {
-      const pa = subjectResources.find(
-        (r) => (r.chapters?.title || "Sans chapitre") === a
-      )?.chapters?.position;
-
-      const pb = subjectResources.find(
-        (r) => (r.chapters?.title || "Sans chapitre") === b
-      )?.chapters?.position;
-
-      if (
-        typeof pa === "number" &&
-        typeof pb === "number" &&
-        pa !== pb
-      ) {
-        return pa - pb;
-      }
-
-      return a.localeCompare(b, "fr");
-    });
-  }, [subjectResources]);
-
-  const activeChapter = chapters.includes(chapterName)
-    ? chapterName
-    : chapters[0] || "";
-
-  const chapterResources = subjectResources.filter(
-    (r) =>
-      (r.chapters?.title || "Sans chapitre") === activeChapter
+  const subjectChapters = useMemo(
+    () =>
+      chapters
+        .filter((chapter) => String(chapter.subject_id) === String(subject?.id))
+        .sort((a, b) => {
+          const pa = Number(a.position ?? 0);
+          const pb = Number(b.position ?? 0);
+          return pa - pb || String(a.title).localeCompare(String(b.title), "fr");
+        }),
+    [chapters, subject?.id]
   );
 
-  const cours = chapterResources.filter((r) =>
-    /cours|résumé|fiche/i.test(r.type || "")
+  const hasUnchapteredResources = subjectResources.some(
+    (resource) => !resource.chapter_id
   );
 
-  // Exercices uniquement : exclure les ressources déjà corrigées
-  // (ex. type = "Exercice corrigé") pour éviter les doublons.
-  const exercises = chapterResources.filter((r) => {
-    const type = String(r.type || "");
-    const title = String(r.title || "");
-    const description = String(r.description || "");
+  const chapterOptions = useMemo(
+    () => [
+      ...subjectChapters.map((chapter) => ({
+        id: String(chapter.id),
+        title: chapter.title,
+        position: chapter.position,
+      })),
+      ...(hasUnchapteredResources
+        ? [{ id: "sans-chapitre", title: "Sans chapitre", position: 999999 }]
+        : []),
+    ],
+    [subjectChapters, hasUnchapteredResources]
+  );
 
-    const isExercise = /exercice|examen|contrôle/i.test(type);
-    const isCorrection =
-      /corrig|correction/i.test(type) ||
-      /corrig|correction/i.test(title) ||
-      /corrig|correction/i.test(description);
+  const activeChapterId = chapterOptions.some((item) => item.id === selectedChapterId)
+    ? selectedChapterId
+    : chapterOptions[0]?.id || "";
 
-    return isExercise && !isCorrection;
+  const activeChapter = chapterOptions.find((item) => item.id === activeChapterId);
+
+  const chapterResources = subjectResources.filter((resource) =>
+    activeChapterId === "sans-chapitre"
+      ? !resource.chapter_id
+      : String(resource.chapter_id) === activeChapterId
+  );
+
+  const cours = chapterResources.filter((resource) =>
+    /cours|résumé|resume|fiche|leçon|lecon/i.test(String(resource.type || ""))
+  );
+
+  const corrections = chapterResources.filter((resource) => {
+    const searchable = `${resource.type || ""} ${resource.title || ""} ${resource.description || ""}`;
+    return /corrig|correction|solution/i.test(searchable);
   });
 
-  // Corrections uniquement
-  const corrections = chapterResources.filter((r) => {
-    const type = String(r.type || "");
-    const title = String(r.title || "");
-    const description = String(r.description || "");
-
-    return (
-      /corrig|correction/i.test(type) ||
-      /corrig|correction/i.test(title) ||
-      /corrig|correction/i.test(description)
-    );
+  const exercises = chapterResources.filter((resource) => {
+    const searchable = `${resource.type || ""} ${resource.title || ""} ${resource.description || ""}`;
+    return /exercice|examen|contrôle|controle|test/i.test(searchable) &&
+      !/corrig|correction|solution/i.test(searchable);
   });
 
-  const pdfs = chapterResources.filter(
-    (r) => /pdf/i.test(r.type || "") || r.file_url
-  );
 
-  // Extraction du numéro de l'exercice ou de la correction
-  function getExerciseNumber(resource: any): number | null {
-    const text = `${resource.title || ""} ${resource.description || ""}`;
-
-    const match = text.match(
-      /(?:exercice|exercices|correction|corrigé|corrige)\s*(?:n[°ºo]?\s*)?(\d+)/i
-    );
-
-    return match ? Number(match[1]) : null;
-  }
-
-  // Associer exercice et correction selon leur numéro
-  const pairedExercises = useMemo(() => {
-    const sortedExercises = [...exercises].sort((a, b) => {
-      const numA = getExerciseNumber(a);
-      const numB = getExerciseNumber(b);
-
-      if (numA !== null && numB !== null) {
-        return numA - numB;
-      }
-
-      return String(a.title || "").localeCompare(
-        String(b.title || ""),
-        "fr"
-      );
-    });
-
-    return sortedExercises.map((exercise, index) => {
-      const exerciseNumber = getExerciseNumber(exercise);
-
-      let correction = corrections.find((c) => {
-        const correctionNumber = getExerciseNumber(c);
-
-        return (
-          exerciseNumber !== null &&
-          correctionNumber === exerciseNumber
-        );
-      });
-
-      // Si les numéros ne sont pas disponibles,
-      // on associe les ressources selon leur ordre.
-      if (!correction && exerciseNumber === null) {
-        correction = corrections[index];
-      }
-
-      return {
-        exercise,
-        correction,
-        number: exerciseNumber ?? index + 1,
-      };
-    });
-  }, [exercises, corrections]);
-
-  function resourceCard(
-    r: any,
-    accent = BLUE,
-    showNumber = false
-  ) {
+  function resourceCard(resource: any, accent = BLUE) {
     return (
       <article
-        key={r.id}
+        key={resource.id}
         style={{
           border: "1px solid #d8e5f5",
           borderRadius: 13,
@@ -260,14 +165,7 @@ export default function LevelLearningClient({
           overflowWrap: "anywhere",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 6,
-            marginBottom: 8,
-          }}
-        >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
           <span
             style={{
               background: "#e4efff",
@@ -278,10 +176,9 @@ export default function LevelLearningClient({
               fontWeight: 900,
             }}
           >
-            {r.type}
+            {resource.type || "Ressource"}
           </span>
-
-          {r.is_premium && (
+          {resource.is_premium && (
             <span
               style={{
                 background: "#fff0c2",
@@ -297,16 +194,8 @@ export default function LevelLearningClient({
           )}
         </div>
 
-        <b
-          style={{
-            fontSize: 15,
-            lineHeight: 1.4,
-          }}
-        >
-          {r.title}
-        </b>
-
-        {r.description && (
+        <b style={{ fontSize: 15, lineHeight: 1.4 }}>{resource.title}</b>
+        {resource.description && (
           <p
             style={{
               margin: "6px 0 0",
@@ -315,21 +204,14 @@ export default function LevelLearningClient({
               whiteSpace: "pre-wrap",
             }}
           >
-            {r.description}
+            {resource.description}
           </p>
         )}
 
-        {r.file_url && !r.is_premium && (
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 7,
-              marginTop: 10,
-            }}
-          >
+        {resource.file_url && !resource.is_premium && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginTop: 10 }}>
             <button
-              onClick={() => setViewingResource(r)}
+              onClick={() => setViewingResource(resource)}
               style={{
                 background: BLUE,
                 color: "white",
@@ -343,19 +225,8 @@ export default function LevelLearningClient({
             >
               👁 Consulter
             </button>
-
             <a
-              href={`/api/download?url=${encodeURIComponent(
-                r.file_url
-              )}&title=${encodeURIComponent(
-                r.title || "document"
-              )}&resource_id=${encodeURIComponent(
-                String(r.id || "")
-              )}&level_id=${encodeURIComponent(
-                String(r.level_id || "")
-              )}&subject_id=${encodeURIComponent(
-                String(r.subject_id || "")
-              )}`}
+              href={`/api/download?url=${encodeURIComponent(resource.file_url)}&title=${encodeURIComponent(resource.title || "document")}&resource_id=${encodeURIComponent(String(resource.id || ""))}&level_id=${encodeURIComponent(String(resource.level_id || level.id))}&subject_id=${encodeURIComponent(String(resource.subject_id || ""))}`}
               style={{
                 background: "#20a43a",
                 color: "white",
@@ -375,121 +246,72 @@ export default function LevelLearningClient({
     );
   }
 
-  const tabButton = (
-    key: typeof tab,
-    label: string,
-    icon: string
-  ) => (
-    <button
-      onClick={() => {
-        setTab(key);
-        setViewingResource(null);
-      }}
-      style={{
-        border: "1px solid #9bb9e6",
-        borderRadius: 12,
-        padding: "13px 8px",
-        background:
-          tab === key
-            ? "linear-gradient(100deg,#0645b8,#084de0)"
-            : "#f8fbff",
-        color: tab === key ? "white" : NAVY,
-        fontWeight: 900,
-        fontSize: 16,
-        cursor: "pointer",
-      }}
-    >
-      {icon} {label}
-    </button>
-  );
+  function sectionTitle(title: string, background: string) {
+    return (
+      <h3
+        style={{
+          margin: "0 0 12px",
+          background,
+          borderRadius: 10,
+          padding: 12,
+          fontSize: 19,
+        }}
+      >
+        {title}
+      </h3>
+    );
+  }
 
   return (
     <main style={styles.page}>
-      {/* BREADCRUMB */}
       <div style={styles.breadcrumb}>
-        ⌂ Accueil　›　{level.cycle || "Niveau"}　›　{level.name}
-       　›　{subject?.name || "Matière"}
+        ⌂ Accueil　›　{level.cycle || "Niveau"}　›　{level.name}　›　{subject?.name || "Matière"}
       </div>
 
-      {/* HEADER */}
       <header style={styles.banner}>
         <div>
-          <div
-            style={{
-              fontSize: 13,
-              opacity: 0.9,
-              fontWeight: 700,
-            }}
-          >
+          <div style={{ fontSize: 13, opacity: 0.9, fontWeight: 700 }}>
             ESPACE ÉDUCATIF • MASSAR
           </div>
-
-          <h1
-            style={{
-              margin: "7px 0 0",
-              fontSize: "clamp(24px,3vw,36px)",
-              fontWeight: 900,
-            }}
-          >
-            {subject?.icon || "📚"}{" "}
-            {subject?.name || "Choisissez une matière"} – {level.name}
+          <h1 style={{ margin: "7px 0 0", fontSize: "clamp(24px,3vw,36px)", fontWeight: 900 }}>
+            {subject?.icon || "📚"} {subject?.name || "Choisissez une matière"} – {level.name}
           </h1>
         </div>
-
-        <div style={{ fontSize: 54 }} aria-hidden>
-          📚 ✏️
-        </div>
+        <div style={{ fontSize: 54 }} aria-hidden>📚 ✏️</div>
       </header>
 
-      {/* SUBJECTS */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-          marginBottom: 14,
-        }}
-      >
-        {subjects.map((s) => (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        {subjects.map((item) => (
           <button
-            key={s.id}
+            key={item.id}
             onClick={() => {
-              setSubjectId(String(s.id));
-              setChapterName("");
+              setSubjectId(String(item.id));
+              setSelectedChapterId("");
               setViewingResource(null);
             }}
             style={{
               border: "1px solid #b7cbe8",
               borderRadius: 12,
               padding: "10px 15px",
-              background:
-                String(s.id) === String(subject?.id)
-                  ? BLUE
-                  : "white",
-              color:
-                String(s.id) === String(subject?.id)
-                  ? "white"
-                  : NAVY,
+              background: String(item.id) === String(subject?.id) ? BLUE : "white",
+              color: String(item.id) === String(subject?.id) ? "white" : NAVY,
               fontWeight: 900,
               cursor: "pointer",
             }}
           >
-            {s.icon || "📘"} {s.name}
+            {item.icon || "📘"} {item.name}
           </button>
         ))}
       </div>
 
-      {/* MAIN GRID */}
       <div style={styles.mainGrid}>
-        {/* SIDEBAR */}
         <aside style={styles.sidebar}>
           <div style={styles.sideHead}>📖 Chapitres</div>
-
-          {chapters.map((chapter, i) => (
+          {chapterOptions.map((chapter, index) => (
             <button
-              key={chapter}
+              key={chapter.id}
               onClick={() => {
-                setChapterName(chapter);
+                setSelectedChapterId(chapter.id);
                 setViewingResource(null);
               }}
               style={{
@@ -502,321 +324,109 @@ export default function LevelLearningClient({
                 textAlign: "left",
                 borderRadius: 12,
                 border: "1px solid #d2e0f3",
-                background:
-                  chapter === activeChapter
-                    ? "linear-gradient(100deg,#0645b8,#0759c8)"
-                    : "white",
-                color:
-                  chapter === activeChapter ? "white" : NAVY,
+                background: chapter.id === activeChapterId
+                  ? "linear-gradient(100deg,#0645b8,#0759c8)"
+                  : "white",
+                color: chapter.id === activeChapterId ? "white" : NAVY,
                 fontWeight: 900,
                 fontSize: 14,
                 cursor: "pointer",
               }}
             >
-              <span style={{ fontSize: 20 }}>📁</span>
-
+              <span style={{ fontSize: 20 }}>{chapter.id === "sans-chapitre" ? "📄" : "📁"}</span>
               <span style={{ flex: 1 }}>
-                Chapitre {i + 1} : {chapter}
+                {chapter.id === "sans-chapitre" ? chapter.title : `Chapitre ${index + 1} : ${chapter.title}`}
               </span>
-
-              <span>⌄</span>
+              <span>›</span>
             </button>
           ))}
+          {!chapterOptions.length && (
+            <p style={{ padding: 14, color: "#64748b" }}>Aucun chapitre disponible.</p>
+          )}
         </aside>
 
-        {/* CONTENT */}
         <section style={styles.main}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 10,
-              flexWrap: "wrap",
-            }}
-          >
-            <h2
-              style={{
-                margin: "4px 0",
-                fontSize: "clamp(20px,2.4vw,27px)",
-                fontWeight: 900,
-              }}
-            >
-              📂 {activeChapter || "Aucun chapitre"}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <h2 style={{ margin: "4px 0", fontSize: "clamp(20px,2.4vw,27px)", fontWeight: 900 }}>
+              📂 {activeChapter?.title || "Aucun chapitre"}
             </h2>
-
-            <span
-              style={{
-                color: "#59708f",
-                fontWeight: 700,
-                fontSize: 13,
-              }}
-            >
+            <span style={{ color: "#59708f", fontWeight: 700, fontSize: 13 }}>
               {level.name} › {subject?.name}
             </span>
           </div>
 
-          {/* CHAPTER TITLE */}
-          <div
-            style={{
-              background:
-                "linear-gradient(90deg,#0645b8,#087fe5)",
-              color: "white",
-              borderRadius: 12,
-              padding: "18px 15px",
-              fontWeight: 900,
-              marginTop: 10,
-              fontSize: 20,
-              boxShadow: "0 4px 12px #0645b820",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            📖 Leçon : {activeChapter}
-          </div>
-
-          {/* TABS */}
-          <div style={styles.tabRow}>
-            {tabButton("cours", "Cours", "📖")}
-
-            {tabButton(
-              "exercices",
-              "Exercices + Correction",
-              "📝"
-            )}
-          </div>
-
-          {/* INLINE PDF VIEWER */}
           {viewingResource && (
-            <div
-              style={{
-                border: "1px solid #b8cce9",
-                borderRadius: 15,
-                padding: 12,
-                background: "#f5faff",
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  marginBottom: 10,
-                }}
-              >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 17,
-                    fontWeight: 900,
-                  }}
-                >
-                  📄 {viewingResource.title}
-                </h3>
-
+            <div style={{ border: "1px solid #b8cce9", borderRadius: 15, padding: 12, background: "#f5faff", marginTop: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 900 }}>📄 {viewingResource.title}</h3>
                 <button
                   onClick={() => setViewingResource(null)}
-                  style={{
-                    background: "#dc2626",
-                    color: "white",
-                    border: "none",
-                    borderRadius: 9,
-                    padding: "8px 12px",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
+                  style={{ background: "#dc2626", color: "white", border: "none", borderRadius: 9, padding: "8px 12px", fontWeight: 800, cursor: "pointer" }}
                 >
                   ✖ Fermer
                 </button>
               </div>
-
               <iframe
                 src={viewingResource.file_url}
                 title={viewingResource.title}
-                style={{
-                  width: "100%",
-                  height: "75vh",
-                  minHeight: 450,
-                  border: "1px solid #d2e0f3",
-                  borderRadius: 10,
-                  background: "white",
-                }}
+                style={{ width: "100%", height: "75vh", minHeight: 450, border: "1px solid #d2e0f3", borderRadius: 10, background: "white" }}
               />
-
               <div style={{ marginTop: 10 }}>
-                <a
-                  href={viewingResource.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: BLUE,
-                    fontWeight: 800,
-                    fontSize: 13,
-                  }}
-                >
+                <a href={viewingResource.file_url} target="_blank" rel="noopener noreferrer" style={{ color: BLUE, fontWeight: 800, fontSize: 13 }}>
                   Ouvrir le document dans un nouvel onglet ↗
                 </a>
               </div>
             </div>
           )}
 
-          {/* COURS */}
-          {tab === "cours" && (
-            <div
-              style={{
-                ...styles.pane,
-                background: "#f5faff",
-              }}
-            >
-              <h3
-                style={{
-                  margin: "0 0 12px",
-                  background: "#dceaff",
-                  borderRadius: 10,
-                  padding: 12,
-                  fontSize: 20,
-                }}
-              >
-                📘 Cours
-              </h3>
+          <div
+            style={{
+              background: "linear-gradient(90deg,#0645b8,#087fe5)",
+              color: "white",
+              borderRadius: 12,
+              padding: "17px 15px",
+              fontWeight: 900,
+              marginTop: 14,
+              fontSize: 19,
+            }}
+          >
+            📖 Contenu du chapitre : {activeChapter?.title}
+          </div>
 
-              {cours.length ? (
-                cours.map((r) => resourceCard(r))
-              ) : (
-                <p>Aucun cours disponible pour ce chapitre.</p>
-              )}
-            </div>
-          )}
+          <section style={{ ...styles.section, background: "#f5faff" }}>
+            {sectionTitle("📘 Cours", "#dceaff")}
+            {cours.length ? cours.map((resource) => resourceCard(resource)) : (
+              <p style={{ color: "#64748b" }}>Aucun cours disponible pour ce chapitre.</p>
+            )}
+          </section>
 
-          {/* EXERCICES + CORRECTIONS */}
-          {tab === "exercices" && (
-            <div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit,minmax(min(100%,300px),1fr))",
-                  gap: 12,
-                }}
-              >
-                {/* EXERCISES COLUMN */}
-                <div
-                  style={{
-                    ...styles.pane,
-                    background: "#f9fcff",
-                  }}
-                >
-                  <h3
-                    style={{
-                      margin: "0 0 12px",
-                      background:
-                        "linear-gradient(90deg,#dceaff,#c6ddff)",
-                      borderRadius: 10,
-                      padding: 12,
-                      fontSize: 20,
-                    }}
-                  >
-                    ✏️ Exercices
-                  </h3>
+          <section style={{ ...styles.section, background: "#f9fcff" }}>
+            {sectionTitle("✏️ Exercices", "linear-gradient(90deg,#dceaff,#c6ddff)")}
+            {exercises.length ? exercises.map((resource) => resourceCard(resource, "#0875e1")) : (
+              <p style={{ color: "#64748b" }}>Aucun exercice disponible pour ce chapitre.</p>
+            )}
+          </section>
 
-                  {pairedExercises.length ? (
-                    pairedExercises.map((item) => (
-                      <div key={item.exercise.id}>
-                        <div
-                          style={{
-                            background: "#e5efff",
-                            borderRadius: 9,
-                            padding: "8px 10px",
-                            marginBottom: 8,
-                            color: BLUE,
-                            fontWeight: 900,
-                          }}
-                        >
-                          Exercice {item.number}
-                        </div>
+          <section style={{ ...styles.section, background: "#fff8fc", borderColor: "#edc5dc" }}>
+            {sectionTitle("⭕ Corrections", "linear-gradient(90deg,#ffdcec,#ffcae5)")}
+            {corrections.length ? corrections.map((resource) => resourceCard(resource, "#d82e75")) : (
+              <p style={{ color: "#a44c78" }}>Aucune correction disponible pour ce chapitre.</p>
+            )}
+          </section>
 
-                        {resourceCard(
-                          item.exercise,
-                          "#0875e1"
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p>Aucun exercice disponible.</p>
-                  )}
-                </div>
-
-                {/* CORRECTIONS COLUMN */}
-                <div
-                  style={{
-                    ...styles.pane,
-                    background: "#fff8fc",
-                    borderColor: "#edc5dc",
-                  }}
-                >
-                  <h3
-                    style={{
-                      margin: "0 0 12px",
-                      background:
-                        "linear-gradient(90deg,#ffdcec,#ffcae5)",
-                      borderRadius: 10,
-                      padding: 12,
-                      fontSize: 20,
-                    }}
-                  >
-                    ⭕ Corrections
-                  </h3>
-
-                  {pairedExercises.length ? (
-                    pairedExercises.map((item) => (
-                      <div key={item.exercise.id}>
-                        <div
-                          style={{
-                            background: "#ffe5f1",
-                            borderRadius: 9,
-                            padding: "8px 10px",
-                            marginBottom: 8,
-                            color: "#d82e75",
-                            fontWeight: 900,
-                          }}
-                        >
-                          Correction {item.number}
-                        </div>
-
-                        {item.correction ? (
-                          resourceCard(
-                            item.correction,
-                            "#d82e75"
-                          )
-                        ) : (
-                          <div
-                            style={{
-                              border: "1px dashed #edc5dc",
-                              borderRadius: 12,
-                              padding: 14,
-                              marginBottom: 10,
-                              color: "#a44c78",
-                              fontSize: 13,
-                            }}
-                          >
-                            Correction non disponible pour
-                            cet exercice.
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p>Aucune correction disponible.</p>
-                  )}
-                </div>
-              </div>
-            </div>
+          {chapterResources.length === 0 && (
+            <p style={{ padding: 12, color: "#64748b", textAlign: "center" }}>
+              Aucun contenu n’a encore été ajouté à ce chapitre.
+            </p>
           )}
         </section>
       </div>
+
+      <style jsx>{`
+        @media (max-width: 760px) {
+          main > div[style*="grid"] { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </main>
   );
 }
