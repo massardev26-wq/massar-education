@@ -1,115 +1,42 @@
-              Cette rubrique nécessite une table/structure dédiée dans Supabase pour activer les actions.
-              La navigation et l’interface sont en place, mais aucune donnée fictive n’est affichée.
-            </p>
-          </div>
-        )}
+"use client";
 
-        {editingChapter && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "#0b173b99", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-            <div style={{ ...css.panel, width: "min(560px, 100%)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 18px 50px #0003" }}>
-              <h2 style={{ marginTop: 0 }}>✏️ Modifier le chapitre</h2>
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Nom du chapitre</label>
-              <input style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }} value={chapterEditForm.title} onChange={e => setChapterEditForm({ ...chapterEditForm, title: e.target.value })} />
+import { useEffect, useMemo, useState } from "react";
+import { supabase, TYPES } from "@/lib/supabase";
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Matière</label>
-              <select style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }} value={chapterEditForm.subject_id} onChange={e => setChapterEditForm({ ...chapterEditForm, subject_id: e.target.value })}>
-                <option value="">Choisir une matière</option>
-                {data.subjects.map((subject: any) => <option key={subject.id} value={String(subject.id)}>{subject.name}</option>)}
-              </select>
+const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const nm = (arr: any[], id: any) => arr.find((x) => String(x.id) === String(id))?.name || "—";
+const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n || 0);
+const dt = (v: string) => v ? new Date(v).toLocaleDateString("fr-FR") : "—";
+const dtime = (v: string) => v ? new Date(v).toLocaleString("fr-FR") : "—";
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 8 }}>Niveaux associés (choisissez un ou plusieurs)</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 8, marginBottom: 18 }}>
-                {data.levels.map((level: any) => (
-                  <label key={level.id} style={{ display: "flex", alignItems: "center", gap: 7, padding: 8, border: "1px solid #dce5f3", borderRadius: 8 }}>
-                    <input type="checkbox" checked={chapterEditForm.level_ids.includes(String(level.id))} onChange={e => setChapterEditForm({ ...chapterEditForm, level_ids: e.target.checked ? [...chapterEditForm.level_ids, String(level.id)] : chapterEditForm.level_ids.filter(id => id !== String(level.id)) })} />
-                    <span>{level.cycle ? `${level.cycle} — ` : ""}{level.name}</span>
-                  </label>
-                ))}
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button style={css.btn} onClick={() => setEditingChapter(null)}>Annuler</button>
-                <button style={css.primary} onClick={saveChapterEdit}>Enregistrer</button>
-              </div>
-            </div>
-          </div>
-        )}
+const css: any = {
+  page: { minHeight: "100vh", background: "#f4f7fc", color: "#101d4b", fontFamily: "Arial, sans-serif" },
+  sidebar: { background: "linear-gradient(180deg,#062b68,#032052)", color: "white", padding: "18px 12px", minHeight: "100vh" },
+  panel: { background: "#fff", border: "1px solid #dce5f3", borderRadius: 14, boxShadow: "0 2px 8px #0f1e4909", padding: 15 },
+  btn: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 12px", background: "#fff", color: "#102354", fontWeight: 700, cursor: "pointer" },
+  primary: { border: 0, borderRadius: 9, padding: "10px 13px", background: "#0877f9", color: "#fff", fontWeight: 700, cursor: "pointer" },
+  input: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 11px", background: "#fff", color: "#102354", maxWidth: "100%" },
+  th: { background: "#eaf0fb", padding: 10, textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid #d5e0ef" },
+  td: { padding: 10, borderBottom: "1px solid #e6edf6", verticalAlign: "middle" },
+};
 
-        {editingResource && (
-          <div style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1000,
-            background: "#0b173b99",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16
-          }}>
-            <div style={{ ...css.panel, width: "min(520px, 100%)", boxShadow: "0 18px 50px #0003" }}>
-              <h2 style={{ marginTop: 0 }}>✏️ Modifier la ressource</h2>
+const navItems = [
+  ["dashboard", "⌂", "Tableau de bord"],
+  ["levels", "♧", "Niveaux"],
+  ["subjects", "▱", "Matières"],
+  ["resources", "▤", "Ressources"],
+  ["chapters", "▣", "Chapitres"],
+  ["ads", "◉", "Publicités"],
+  ["stats", "▥", "Statistiques"],
+  ["visitors", "👥", "Visiteurs détaillés"],
+  ["users", "♙", "Utilisateurs"],
+  ["settings", "⚙", "Paramètres"],
+];
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Titre</label>
-              <input
-                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }}
-                value={editForm.title}
-                onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                placeholder="Nom de la ressource"
-              />
+export default function Admin() {
+  const [status, setStatus] = useState("load");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Type</label>
-              <select
-                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }}
-                value={editForm.type}
-                onChange={e => setEditForm({ ...editForm, type: e.target.value })}
-              >
-                {[...new Set([...(TYPES || []), editForm.type].filter(Boolean))].map((t: any) =>
-                  <option key={t} value={t}>{t}</option>
-                )}
-              </select>
-
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Niveau</label>
-              <select
-                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 18 }}
-                value={editForm.level_id}
-                onChange={e => setEditForm({ ...editForm, level_id: e.target.value, chapter_id: "" })}
-              >
-                <option value="">Choisir un niveau</option>
-                {data.levels.map((l: any) => (
-                  <option key={l.id} value={String(l.id)}>
-                    {l.cycle ? `${l.cycle} — ` : ""}{l.name}
-                  </option>
-                ))}
-              </select>
-
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Chapitre (facultatif)</label>
-              <select
-                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 18 }}
-                value={editForm.chapter_id || ""}
-                onChange={e => setEditForm({ ...editForm, chapter_id: e.target.value })}
-              >
-                <option value="">Aucun chapitre</option>
-                {data.chapters
-                  .filter((c: any) =>
-                    String(c.level_id) === String(editForm.level_id) &&
-                    String(c.subject_id) === String(editingResource.subject_id)
-                  )
-                  .sort((a: any, b: any) =>
-                    (Number(a.position ?? 999999) - Number(b.position ?? 999999)) ||
-                    String(a.title || "").localeCompare(String(b.title || ""), "fr")
-                  )
-                  .map((c: any) => (
-                    <option key={c.id} value={String(c.id)}>{c.title}</option>
-                  ))}
-              </select>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button style={css.btn} onClick={() => setEditingResource(null)}>Annuler</button>
-                <button style={css.primary} onClick={saveResourceEdit}>Enregistrer les modifications</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-    </div>
-  </main>;
-}
+  // باقي الكود كيتبع فالأجزاء المقبلة
