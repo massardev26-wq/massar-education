@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import VisitTracker from "./components/VisitTracker";
 import Script from "next/script";
+import { supabase } from "@/lib/supabase";
 
 export const metadata = {
   title: "Association Massar - Espace éducatif",
@@ -15,11 +16,15 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: ReactNode;
 }) {
+  const { data: menuLevels } = await supabase
+    .from("levels")
+    .select("id,name,slug,cycle,position")
+    .order("position", { ascending: true });
   return (
     <html lang="fr">
       <body>
@@ -89,160 +94,3 @@ export default function RootLayout({
                       color: "#123579",
                       fontSize: "21px",
                       fontWeight: 900,
-                    }}
-                  >
-                    Association{" "}
-                    <span style={{ color: "#269b27" }}>Massar</span>
-                  </div>
-
-                  <div
-                    style={{
-                      color: "#123579",
-                      fontSize: "13px",
-                      fontWeight: 700,
-                    }}
-                  >
-                    pour l’Éducation et le Développement
-                  </div>
-                </div>
-              </a>
-
-              {/* MENU PRINCIPAL */}
-              <nav
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  flex: 1,
-                }}
-              >
-                {[
-                  { label: "⌂ Accueil", href: "/" },
-                  { label: "Niveaux ⌄", href: "/#niveaux" },
-                ].map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    style={{
-                      color: "#123579",
-                      fontWeight: 800,
-                      fontSize: "16px",
-                      padding: "12px 15px",
-                      borderRadius: "12px",
-                      textDecoration: "none",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </nav>
-
-              {/* SE CONNECTER */}
-              <a
-                href="/admin"
-                style={{
-                  background: "#0750ad",
-                  color: "#ffffff",
-                  padding: "15px 28px",
-                  borderRadius: "35px",
-                  fontSize: "16px",
-                  fontWeight: 800,
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 4px 12px rgba(7,80,173,0.18)",
-                }}
-              >
-                👤 Se connecter
-              </a>
-            </div>
-          </header>
-
-          {/* CONTENU */}
-          {children}
-
-          {/* FOOTER */}
-          <footer
-            style={{
-              background: "#123579",
-              color: "#ffffff",
-              padding: "35px 5%",
-              marginTop: "30px",
-            }}
-          >
-            <div
-              style={{
-                maxWidth: "1500px",
-                margin: "auto",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "20px",
-                  fontWeight: 900,
-                  marginBottom: "10px",
-                }}
-              >
-                Association Massar pour l’Éducation et le Développement
-              </div>
-
-              <p
-                style={{
-                  color: "#dbe5ff",
-                  margin: "8px 0 18px",
-                }}
-              >
-                Ensemble pour une éducation de qualité et un avenir meilleur.
-              </p>
-
-              {/* SOCIAL MEDIA */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: "20px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <a
-                  href="https://www.tiktok.com/@massar.dev26"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "white",
-                    fontWeight: 700,
-                  }}
-                >
-                  TikTok
-                </a>
-
-                <a
-                  href="https://www.instagram.com/massar_dev/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "white",
-                    fontWeight: 700,
-                  }}
-                >
-                  Instagram
-                </a>
-              </div>
-            </div>
-          </footer>
-
-          {/* WHATSAPP */}
-          <a
-            className="wa"
-            href="https://wa.me/212699516777"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            💬 WhatsApp
-          </a>
-        </div>
-      </body>
-    </html>
-  );
-}
