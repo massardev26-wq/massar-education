@@ -7,7 +7,7 @@ const NAVY = "#08245f";
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    color: NAVY,
+    color: NAVY, 
     background: "#f7faff",
     padding: "16px 1.2% 28px",
     fontFamily: "Arial, sans-serif",
