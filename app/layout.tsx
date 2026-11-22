@@ -7,7 +7,7 @@ export const metadata = {
   title: "Association Massar - Espace éducatif",
   description:
     "Cours, exercices, examens et corrections du CP à la 2ème Bac.",
-  verification: {
+  verification: { 
     google: "iBCshDSwXR8fEeD5Yo2jjNqZeBED8jsg7KnLXvRpp34",
   },
   other: {
