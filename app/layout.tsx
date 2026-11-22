@@ -3,11 +3,12 @@ import "./globals.css";
 import VisitTracker from "./components/VisitTracker";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase";
+
 export const metadata = {
   title: "Association Massar - Espace éducatif",
   description:
     "Cours, exercices, examens et corrections du CP à la 2ème Bac.",
-  verification: { 
+  verification: {
     google: "iBCshDSwXR8fEeD5Yo2jjNqZeBED8jsg7KnLXvRpp34",
   },
   other: {
@@ -20,10 +21,11 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
-  const { data: menuLevels } = await supabase
+  const { data: navigationLevels } = await supabase
     .from("levels")
     .select("id,name,slug,cycle,position")
     .order("position", { ascending: true });
+
   return (
     <html lang="fr">
       <body>
@@ -92,225 +94,3 @@ export default async function RootLayout({
                     style={{
                       color: "#123579",
                       fontSize: "21px",
-                      fontWeight: 900,
-                    }}
-                  >
-                    Association{" "}
-                    <span style={{ color: "#269b27" }}>Massar</span>
-                  </div>
-
-                  <div
-                    style={{
-                      color: "#123579",
-                      fontSize: "13px",
-                      fontWeight: 700,
-                    }}
-                  >
-                    pour l’Éducation et le Développement
-                  </div>
-                </div>
-              </a>
-
-              {/* MENU PRINCIPAL */}
-              <nav
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  flexWrap: "wrap",
-                  flex: 1,
-                }}
-              >
-                <a
-                  href="/"
-                  style={{
-                    color: "#123579",
-                    fontWeight: 800,
-                    fontSize: "16px",
-                    padding: "12px 15px",
-                    borderRadius: "12px",
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  ⌂ Accueil
-                </a>
-
-                <details style={{ position: "relative" }}>
-                  <summary
-                    style={{
-                      color: "#123579",
-                      fontWeight: 800,
-                      fontSize: "16px",
-                      padding: "12px 15px",
-                      borderRadius: "12px",
-                      cursor: "pointer",
-                      listStyle: "none",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Niveaux ⌄
-                  </summary>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      minWidth: 220,
-                      maxHeight: 360,
-                      overflowY: "auto",
-                      background: "#ffffff",
-                      border: "1px solid #dce7f5",
-                      borderRadius: 12,
-                      boxShadow: "0 12px 30px #12357920",
-                      padding: 8,
-                      zIndex: 200,
-                    }}
-                  >
-                    {(menuLevels || []).map((item: any) => (
-                      <a
-                        key={item.id}
-                        href={`/niveau/${item.slug}`}
-                        style={{
-                          display: "block",
-                          color: "#123579",
-                          fontWeight: 750,
-                          padding: "10px 12px",
-                          borderRadius: 8,
-                          textDecoration: "none",
-                        }}
-                      >
-                        {item.cycle ? `${item.cycle} — ` : ""}{item.name}
-                      </a>
-                    ))}
-                    {!menuLevels?.length && (
-                      <span style={{ display: "block", padding: 10, color: "#64748b" }}>
-                        Aucun niveau disponible
-                      </span>
-                    )}
-                  </div>
-                </details>
-
-                <a
-                  href="/#niveaux"
-                  style={{
-                    color: "#123579",
-                    fontWeight: 800,
-                    fontSize: "16px",
-                    padding: "12px 15px",
-                    borderRadius: "12px",
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  📚 Cours
-                </a>
-              </nav>
-
-              {/* SE CONNECTER */}
-              <a
-                href="/admin"
-                style={{
-                  background: "#0750ad",
-                  color: "#ffffff",
-                  padding: "15px 28px",
-                  borderRadius: "35px",
-                  fontSize: "16px",
-                  fontWeight: 800,
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 4px 12px rgba(7,80,173,0.18)",
-                }}
-              >
-                👤 Se connecter
-              </a>
-            </div>
-          </header>
-
-          {/* CONTENU */}
-          {children}
-
-          {/* FOOTER */}
-          <footer
-            style={{
-              background: "#123579",
-              color: "#ffffff",
-              padding: "35px 5%",
-              marginTop: "30px",
-            }}
-          >
-            <div
-              style={{
-                maxWidth: "1500px",
-                margin: "auto",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "20px",
-                  fontWeight: 900,
-                  marginBottom: "10px",
-                }}
-              >
-                Association Massar pour l’Éducation et le Développement
-              </div>
-
-              <p
-                style={{
-                  color: "#dbe5ff",
-                  margin: "8px 0 18px",
-                }}
-              >
-                Ensemble pour une éducation de qualité et un avenir meilleur.
-              </p>
-
-              {/* SOCIAL MEDIA */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: "20px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <a
-                  href="https://www.tiktok.com/@massar.dev26"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "white",
-                    fontWeight: 700,
-                  }}
-                >
-                  TikTok
-                </a>
-
-                <a
-                  href="https://www.instagram.com/massar_dev/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: "white",
-                    fontWeight: 700,
-                  }}
-                >
-                  Instagram
-                </a>
-              </div> 
-            </div>
-          </footer>
-
-          {/* WHATSAPP */}
-          <a
-            className="wa"
-            href="https://wa.me/212699516777"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            💬 WhatsApp
-          </a>
-        </div>
-      </body>
-    </html>
-  );
-}
