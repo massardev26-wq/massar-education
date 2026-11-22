@@ -1,108 +1,96 @@
-                   style={{ ...css.input, width: "100%", marginTop: 8 }}
-                  rows={3}
-                  defaultValue={a.code || ""}
-                  placeholder="Code AdSense facultatif"
-                  onBlur={e => run(supabase.from("ads").update({ code: e.target.value }).eq("slot", a.slot))}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+"use client";
 
-        {(section === "users" || section === "settings") && (
-          <div style={css.panel}>
-            <h2>{section === "users" ? "♙ Utilisateurs" : "⚙ Paramètres"}</h2>
-            <p>
-              Cette rubrique nécessite une table/structure dédiée dans Supabase pour activer les actions.
-              La navigation et l’interface sont en place, mais aucune donnée fictive n’est affichée.
-            </p>
-          </div>
-        )}
+import { useEffect, useMemo, useState } from "react";
+import { supabase, TYPES } from "@/lib/supabase";
 
-        {editingResource && (
-          <div style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1000,
-            background: "#0b173b99",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16
-          }}>
-            <div style={{ ...css.panel, width: "min(520px, 100%)", boxShadow: "0 18px 50px #0003" }}>
-              <h2 style={{ marginTop: 0 }}>✏️ Modifier la ressource</h2>
+const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const nm = (arr: any[], id: any) => arr.find((x) => String(x.id) === String(id))?.name || "—";
+const fmt = (n: number) => new Intl.NumberFormat("fr-FR").format(n || 0);
+const dt = (v: string) => v ? new Date(v).toLocaleDateString("fr-FR") : "—";
+const dtime = (v: string) => v ? new Date(v).toLocaleString("fr-FR") : "—";
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Titre</label>
-              <input
-                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }}
-                value={editForm.title}
-                onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                placeholder="Nom de la ressource"
-              />
+const css: any = {
+  page: { minHeight: "100vh", background: "#f4f7fc", color: "#101d4b", fontFamily: "Arial, sans-serif" },
+  sidebar: { background: "linear-gradient(180deg,#062b68,#032052)", color: "white", padding: "18px 12px", minHeight: "100vh" },
+  panel: { background: "#fff", border: "1px solid #dce5f3", borderRadius: 14, boxShadow: "0 2px 8px #0f1e4909", padding: 15 },
+  btn: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 12px", background: "#fff", color: "#102354", fontWeight: 700, cursor: "pointer" },
+  primary: { border: 0, borderRadius: 9, padding: "10px 13px", background: "#0877f9", color: "#fff", fontWeight: 700, cursor: "pointer" },
+  input: { border: "1px solid #cbd8ec", borderRadius: 9, padding: "9px 11px", background: "#fff", color: "#102354", maxWidth: "100%" },
+  th: { background: "#eaf0fb", padding: 10, textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid #d5e0ef" },
+  td: { padding: 10, borderBottom: "1px solid #e6edf6", verticalAlign: "middle" },
+};
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Type</label>
-              <select
-                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 14 }}
-                value={editForm.type}
-                onChange={e => setEditForm({ ...editForm, type: e.target.value })}
-              >
-                {[...new Set([...(TYPES || []), editForm.type].filter(Boolean))].map((t: any) =>
-                  <option key={t} value={t}>{t}</option>
-                )}
-              </select>
+const navItems = [
+  ["dashboard", "⌂", "Tableau de bord"],
+  ["levels", "♧", "Niveaux"],
+  ["subjects", "▱", "Matières"],
+  ["resources", "▤", "Ressources"],
+  ["chapters", "▣", "Chapitres"],
+  ["ads", "◉", "Publicités"],
+  ["stats", "▥", "Statistiques"],
+  ["visitors", "👥", "Visiteurs détaillés"],
+  ["users", "♙", "Utilisateurs"],
+  ["settings", "⚙", "Paramètres"],
+];
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Niveaux concernés</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
-                {data.levels.map((l: any) => (
-                  <label key={l.id} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                    <input type="checkbox" checked={(editForm.level_ids || []).map(String).includes(String(l.id))} onChange={e => {
-                      const current = (editForm.level_ids || []).map(String);
-                      const next = e.target.checked ? [...current, String(l.id)] : current.filter((id: string) => id !== String(l.id));
-                      setEditForm({ ...editForm, level_ids: next, level_id: next[0] || "", chapter_id: "" });
-                    }} />
-                    {l.name}
-                  </label>
-                ))}
-              </div>
+export default function Admin() {
+  const [status, setStatus] = useState("load");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [section, setSection] = useState("dashboard");
+  const [cycleOpen, setCycleOpen] = useState("Primaire");
+  const [levelSelected, setLevelSelected] = useState<any>(null);
+  const [subjectSelected, setSubjectSelected] = useState<any>(null);
+  const [resourceType, setResourceType] = useState("Toutes");
+  const [resourceSearch, setResourceSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [visitorSearch, setVisitorSearch] = useState("");
+  const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(null);
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Contenu du cours</label>
-              <textarea
-                style={{ ...css.input, width: "100%", minHeight: 180, boxSizing: "border-box", marginBottom: 14 }}
-                value={editForm.content || ""}
-                onChange={e => setEditForm({ ...editForm, content: e.target.value })}
-                placeholder="Texte du cours affiché sur la page dédiée"
-              />
+  const [data, setData] = useState<any>({
+    levels: [],
+    subjects: [],
+    level_subjects: [],
+    chapters: [],
+    resources: [],
+    resource_levels: [],
+    ads: [],
+    visits: [],
+    downloads: [],
+  });
 
-              <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }}>Chapitre (facultatif)</label>
-              <select
-                style={{ ...css.input, width: "100%", boxSizing: "border-box", marginBottom: 18 }}
-                value={editForm.chapter_id || ""}
-                onChange={e => setEditForm({ ...editForm, chapter_id: e.target.value })}
-              >
-                <option value="">Aucun chapitre</option>
-                {data.chapters
-                  .filter((c: any) =>
-                    String(c.level_id) === String(editForm.level_id) &&
-                    String(c.subject_id) === String(editingResource.subject_id)
-                  )
-                  .sort((a: any, b: any) =>
-                    (Number(a.position ?? 999999) - Number(b.position ?? 999999)) ||
-                    String(a.title || "").localeCompare(String(b.title || ""), "fr")
-                  )
-                  .map((c: any) => (
-                    <option key={c.id} value={String(c.id)}>{c.title}</option>
-                  ))}
-              </select>
+  const [form, setForm] = useState<any>({ type: TYPES?.[0] || "Exercice", level_ids: [], content: "" });
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [editForm, setEditForm] = useState<any>({
+    title: "",
+    type: TYPES?.[0] || "Exercice",
+    level_id: "",
+    level_ids: [] as string[],
+    content: "",
+    chapter_id: "",
+  });
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button style={css.btn} onClick={() => setEditingResource(null)}>Annuler</button>
-                <button style={css.primary} onClick={saveResourceEdit}>Enregistrer les modifications</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-    </div>
-  </main>;
-}
+  const [newLevel, setNewLevel] = useState({ name: "", cycle: "Primaire" });
+  const [newSubject, setNewSubject] = useState({ name: "", icon: "📘", levels: [] as any[] });
+  const [newChapter, setNewChapter] = useState("");
+  const [draggedChapterId, setDraggedChapterId] = useState<string | number | null>(null);
+  const [dateRangeLabel, setDateRangeLabel] = useState("Période personnalisée");
+
+  async function load() {
+    const [levels, subjects, level_subjects, chapters, resources, resource_levels, ads, visits, downloads] = await Promise.all([
+      supabase.from("levels").select("*").order("position"),
+      supabase.from("subjects").select("*").order("name"),
+      supabase.from("level_subjects").select("level_id,subject_id"),
+      supabase.from("chapters").select("*").order("position", { ascending: true }).order("title", { ascending: true }),
+      supabase.from("resources").select("*").order("created_at", { ascending: false }),
+      supabase.from("resource_levels").select("resource_id,level_id"),
+      supabase.from("ads").select("*").order("slot"),
+      supabase.from("site_visits").select("visitor_id,page_path,visited_at").order("visited_at", { ascending: false }),
+      supabase.from("resource_downloads").select("resource_id,resource_title,level_id,subject_id,downloaded_at").order("downloaded_at", { ascending: false }),
+    ]);
+
+    const errs = [levels, subjects, level_subjects, chapters, resources, resource_levels, ads, visits, downloads].filter(x => x.error);
