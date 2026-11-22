@@ -8,7 +8,7 @@ export default async function CoursePage({ params }: { params: { id: string } })
     .from("resources")
     .select("*, levels(name,slug), subjects(name,icon), chapters(title)")
     .eq("id", Number(params.id))
-    .maybeSingle(); 
+    .maybeSingle();
 
   if (error || !resource) {
     return <main style={{ maxWidth: 900, margin: "40px auto", padding: 24 }}><h1>Cours introuvable</h1><Link href="/">Retour à l’accueil</Link></main>;
