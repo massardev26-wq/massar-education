@@ -407,7 +407,7 @@ export default function LevelLearningClient({
             {sectionTitle("✏️ Exercices", "linear-gradient(90deg,#dceaff,#c6ddff)")}
             {exercises.length ? exercises.map((resource) => resourceCard(resource, "#0875e1")) : (
               <p style={{ color: "#64748b" }}>Aucun exercice disponible pour ce chapitre.</p>
-            )}
+            )} 
           </section>
 
           <section style={{ ...styles.section, background: "#fff8fc", borderColor: "#edc5dc" }}>
