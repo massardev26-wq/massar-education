@@ -1,4 +1,4 @@
-                  style={{ ...css.input, width: "100%", marginTop: 8 }}
+                   style={{ ...css.input, width: "100%", marginTop: 8 }}
                   rows={3}
                   defaultValue={a.code || ""}
                   placeholder="Code AdSense facultatif"
