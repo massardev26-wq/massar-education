@@ -12,7 +12,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "16px 1.2% 28px",
     fontFamily: "Arial, sans-serif",
   },
-  breadcrumb: {
+  breadcrumb: { 
     color: BLUE,
     fontWeight: 700,
     fontSize: 14,
