@@ -3,7 +3,6 @@ import "./globals.css";
 import VisitTracker from "./components/VisitTracker";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase";
-
 export const metadata = {
   title: "Association Massar - Espace éducatif",
   description:
