@@ -1,10 +1,14 @@
+
 "use client";
+
 import { useMemo, useState } from "react";
+
 const BLUE = "#0645b8";
 const NAVY = "#08245f";
+
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    color: NAVY, 
+    color: NAVY,
     background: "#f7faff",
     padding: "16px 1.2% 28px",
     fontFamily: "Arial, sans-serif",
@@ -78,16 +82,34 @@ export default function LevelLearningClient({
   chapters: any[];
   resources: any[];
 }) {
-  const [subjectId, setSubjectId] = useState(String(subjects[0]?.id ?? ""));
+  const [subjectId, setSubjectId] = useState(
+    String(subjects[0]?.id ?? "")
+  );
+
   const [selectedChapterId, setSelectedChapterId] = useState("");
   const [viewingResource, setViewingResource] = useState<any>(null);
 
   const subject =
-    subjects.find((item) => String(item.id) === subjectId) || subjects[0];
+    subjects.find((item) => String(item.id) === subjectId) ||
+    subjects[0];
 
   const subjectResources = useMemo(
-    () => resources.filter((resource) => String(resource.subject_id) === String(subject?.id)),
+    () =>
+      resources.filter(
+        (resource) =>
+          String(resource.subject_id) === String(subject?.id)
+      ),
     [resources, subject?.id]
   );
 
   const subjectChapters = useMemo(
+    () =>
+      chapters.filter(
+        (chapter) =>
+          String(chapter.subject_id) === String(subject?.id)
+      ),
+    [chapters, subject?.id]
+  );
+
+  // باقي الكود خاصو يتكمل انطلاقاً من الملف الأصلي.
+}
