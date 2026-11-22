@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 const BLUE = "#0645b8";
-const NAVY = "#08245f";
+const NAVY = "#08245f"; 
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
