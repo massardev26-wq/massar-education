@@ -83,7 +83,7 @@ export default async function CoursePage({
               href={resource.file_url}
               download
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener noreferrer" 
               style={{
                 display: "inline-flex",
                 alignItems: "center",
