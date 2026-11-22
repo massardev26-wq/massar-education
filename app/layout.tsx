@@ -297,7 +297,7 @@ export default async function RootLayout({
                 >
                   Instagram
                 </a>
-              </div>
+              </div> 
             </div>
           </footer>
 
